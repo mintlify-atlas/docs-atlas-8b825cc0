@@ -1,0 +1,359 @@
+---
+title: Creating Service Requests
+description: Learn how to create and publish service requests on Duit
+---
+
+## Overview
+
+Service requests are how you communicate your service needs to professionals. Creating a clear, detailed request helps attract qualified professionals and ensures you receive accurate quotes.
+
+## The ServiceRequest Entity
+
+Service requests are stored using the `ServiceRequest` entity with validation and constraints:
+
+```java ServiceRequest.java:22-107
+@Entity
+@Table(name = "service_request")
+public class ServiceRequest extends BaseEntity {
+
+    public enum Status {
+        DRAFT, PUBLISHED, IN_PROGRESS, COMPLETED, CANCELLED, EXPIRED
+    }
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id_request")
+    private Long id;
+
+    @NotBlank(message = "El título es obligatorio")
+    @Size(min = 5, max = 150, message = "El título debe tener entre 5 y 150 caracteres")
+    @Column(name = "title", length = 150, nullable = false)
+    private String title;
+
+    @NotBlank(message = "La descripción es obligatoria")
+    @Size(min = 20, max = 2000, message = "La descripción debe tener entre 20 y 2000 caracteres")
+    @Column(name = "description", columnDefinition = "TEXT", nullable = false)
+    private String description;
+
+    @Column(name = "requested_at")
+    private LocalDateTime requestedAt;
+
+    @Column(name = "deadline")
+    private LocalDateTime deadline;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20, nullable = false)
+    private Status status = Status.DRAFT;
+
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "id_client", nullable = false)
+    private AppUser client;
+
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "id_category", nullable = false)
+    private Category category;
+
+    @ManyToOne(fetch = FetchType.LAZY, cascade = { CascadeType.PERSIST, CascadeType.MERGE })
+    @JoinColumn(name = "id_service_address")
+    private Address serviceAddress;
+}
+```
+
+## Request Form Fields
+
+The request form includes the following required and optional fields:
+
+### Required Fields
+
+<ParamField path="title" type="string" required>
+  Service title (5-150 characters)
+  
+  **Example:** "Need plumber to fix kitchen sink leak"
+</ParamField>
+
+<ParamField path="description" type="string" required>
+  Detailed description of the service needed (20-2000 characters)
+  
+  **Example:** "My kitchen sink has been leaking under the cabinet for two days. I need a licensed plumber to diagnose and fix the issue."
+</ParamField>
+
+<ParamField path="categoryId" type="Long" required>
+  Service category ID (must be active)
+  
+  Common categories: Plumbing, Electrical, Carpentry, Cleaning, etc.
+</ParamField>
+
+<ParamField path="addressOption" type="string" required>
+  Address option: `"habitual"` or `"new"`
+  
+  - `habitual` - Use your profile address
+  - `new` - Specify a different service address
+</ParamField>
+
+### Optional Fields
+
+<ParamField path="deadline" type="LocalDate">
+  Deadline for service completion
+  
+  When you need the work finished by
+</ParamField>
+
+<ParamField path="address" type="string">
+  Street address (required if `addressOption` is "new")
+</ParamField>
+
+<ParamField path="city" type="string">
+  City name (required if `addressOption` is "new")
+</ParamField>
+
+<ParamField path="postalCode" type="string">
+  Postal code (required if `addressOption` is "new")
+</ParamField>
+
+<ParamField path="province" type="string">
+  Province/state (required if `addressOption` is "new")
+</ParamField>
+
+<ParamField path="country" type="string">
+  Country (defaults to "España")
+</ParamField>
+
+<ParamField path="publishNow" type="boolean">
+  Whether to publish immediately or save as draft
+  
+  Default: `false` (saves as DRAFT)
+</ParamField>
+
+## Creating a Request
+
+<Steps>
+  <Step title="Access the request form">
+    Navigate to `/requests/request` to open the service request form.
+  </Step>
+  
+  <Step title="Enter basic information">
+    Fill in the title and description. Be specific about what you need.
+    
+    ```java RequestFormController.java:45-68
+    @GetMapping("/request")
+    public String showRequestForm(@ModelAttribute("form") RequestDTO form,
+            Authentication auth,
+            Model model,
+            @RequestParam(required = false) Long edit,
+            RedirectAttributes redirectAttributes) {
+        try {
+            // Get currently logged in user
+            AppUser usuarioLogueado = authService.getAuthenticatedUser(auth);
+
+            // Configure basic form data
+            basicFormData(model, usuarioLogueado, form);
+
+            // Check if editing existing request
+            boolean esEdicion = edit != null;
+            if (esEdicion) {
+                formForEdit(edit, usuarioLogueado, form, model);
+            } else {
+                formForNewRequest(form);
+            }
+
+            // Send form to view
+            model.addAttribute("form", form);
+            return "jobs/request";
+        } catch (IllegalArgumentException error) {
+            redirectAttributes.addFlashAttribute("error", error.getMessage());
+            return "redirect:/requests/my-requests";
+        }
+    }
+    ```
+  </Step>
+  
+  <Step title="Select a category">
+    Choose the service category that best matches your needs. Only active categories are shown.
+  </Step>
+  
+  <Step title="Set the service location">
+    Choose whether to use your profile address or specify a new address for this service.
+  </Step>
+  
+  <Step title="Add deadline (optional)">
+    If you have a deadline, specify when you need the work completed.
+  </Step>
+  
+  <Step title="Publish or save as draft">
+    - **Publish now**: Request becomes visible to professionals immediately
+    - **Save as draft**: Request is saved but not visible until you publish it later
+  </Step>
+</Steps>
+
+## Form Submission
+
+When you submit the form, the system validates your input:
+
+```java RequestFormController.java:80-133
+@PostMapping("/request")
+public String submitRequestForm(@Valid @ModelAttribute("form") RequestDTO form,
+        BindingResult bindingResult,
+        Authentication auth,
+        Model model,
+        RedirectAttributes redirectAttributes) {
+
+    // Get logged in user
+    AppUser usuarioLogueado = authService.getAuthenticatedUser(auth);
+
+    try {
+        // Validate no form errors
+        if (bindingResult.hasErrors()) {
+            // Handle validation errors - return to form with errors and required data
+            model.addAttribute("habitualAddress", usuarioLogueado.getAddress());
+            model.addAttribute("categorias", serviceRequestService.getActiveCategories());
+            model.addAttribute("missingAddress", usuarioLogueado.getAddress() == null);
+
+            boolean esEdicion = form.getEditId() != null;
+            model.addAttribute("modoEdicion", esEdicion);
+            return "jobs/request";
+        }
+
+        // Save the request to database
+        serviceRequestService.saveRequest(form, usuarioLogueado);
+
+        // Prepare success message based on create or edit
+        boolean fueEdicion = form.getEditId() != null;
+        String mensajeExito = fueEdicion ? "Solicitud actualizada correctamente" : "Solicitud creada correctamente";
+        redirectAttributes.addFlashAttribute("success", mensajeExito);
+        return "redirect:/requests/my-requests";
+
+    } catch (IllegalArgumentException error) {
+        // Handle business validation errors
+        String errorMessage = error.getMessage();
+        bindingResult.reject("error.global", errorMessage != null ? errorMessage : "Error desconocido");
+
+        // Return to form with required data
+        model.addAttribute("habitualAddress", usuarioLogueado.getAddress());
+        model.addAttribute("categorias", serviceRequestService.getActiveCategories());
+        model.addAttribute("missingAddress", usuarioLogueado.getAddress() == null);
+
+        boolean esEdicion = form.getEditId() != null;
+        model.addAttribute("modoEdicion", esEdicion);
+
+        return "jobs/request";
+
+    } catch (Exception error) {
+        // Unexpected error: redirect with generic message
+        redirectAttributes.addFlashAttribute("error", "Error inesperado. Inténtalo de nuevo.");
+        return "redirect:/requests/request";
+    }
+}
+```
+
+## Validation Rules
+
+Your request must meet these validation requirements:
+
+### Title
+- Minimum length: 5 characters
+- Maximum length: 150 characters
+- Cannot be blank
+
+### Description
+- Minimum length: 20 characters
+- Maximum length: 2000 characters
+- Cannot be blank
+
+### Category
+- Must be a valid, active category
+- Cannot be null
+
+### Address
+- If using "habitual" option, your profile must have an address
+- If using "new" option, all address fields are required
+
+## Editing Requests
+
+You can edit requests that are in `DRAFT` or `PUBLISHED` status:
+
+```java RequestFormController.java:155-170
+private void formForEdit(Long editId, AppUser usuario, RequestDTO form, Model model) {
+    // Find the request we want to edit (with status validation)
+    ServiceRequest solicitudExistente = serviceRequestService.getUserRequestForEditing(editId, usuario);
+
+    // Copy basic data to form
+    copyBasicRequestData(solicitudExistente, form);
+
+    // Copy deadline if exists
+    copyDeadline(solicitudExistente, form);
+
+    // Copy address information
+    copyServiceAddress(solicitudExistente, form);
+
+    // Indicate we're in edit mode
+    model.addAttribute("modoEdicion", true);
+}
+```
+
+To edit a request:
+1. Go to **My Requests** (`/requests/my-requests`)
+2. Find the request you want to edit
+3. Click the edit button
+4. Modify the fields
+5. Submit the form
+
+<Warning>
+You cannot edit requests that are `IN_PROGRESS`, `COMPLETED`, `CANCELLED`, or `EXPIRED`.
+</Warning>
+
+## Request Lifecycle
+
+Understand the complete lifecycle of a service request:
+
+1. **DRAFT** - Created but not published (not visible to professionals)
+2. **PUBLISHED** - Visible to professionals, accepting applications
+3. **IN_PROGRESS** - Professional selected, work in progress
+4. **COMPLETED** - Work finished, ready for rating
+5. **CANCELLED** - Request cancelled by client
+6. **EXPIRED** - Request past deadline without completion
+
+## Best Practices
+
+<Tip>
+**Write clear, detailed descriptions**
+
+The more details you provide, the better quotes you'll receive. Include:
+- What needs to be done
+- Any specific requirements or preferences
+- Relevant context (e.g., "existing fixture is 10 years old")
+- Access information if relevant
+</Tip>
+
+<Tip>
+**Choose the right category**
+
+Selecting the correct category ensures your request reaches professionals with the right skills.
+</Tip>
+
+<Tip>
+**Use draft mode for complex requests**
+
+Save as draft if you need time to gather details or review your request before publishing.
+</Tip>
+
+## Common Errors
+
+### "Missing address"
+You selected "habitual" address but your profile doesn't have an address. Either:
+- Add an address to your profile
+- Choose "new" and enter a specific address
+
+### "Title too short"
+Titles must be at least 5 characters. Add more detail to your title.
+
+### "Description too short"
+Descriptions must be at least 20 characters. Provide more detail about what you need.
+
+## Related
+
+- [Finding Professionals](/guides/clients/finding-professionals)
+- [Managing Jobs](/guides/clients/managing-jobs)
+- [Request Lifecycle](/architecture/entities#servicerequest)

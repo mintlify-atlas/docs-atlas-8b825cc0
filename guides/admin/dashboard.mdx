@@ -1,0 +1,273 @@
+---
+title: 'Admin Dashboard'
+description: 'Overview of the admin dashboard features and platform statistics'
+---
+
+The admin dashboard provides administrators with a comprehensive view of platform activity, statistics, and management tools.
+
+## Dashboard Access
+
+Administrators can access dashboard features through dedicated admin routes:
+
+<CardGroup cols={2}>
+  <Card title="User Management" icon="users">
+    **GET** `/admin/users`
+    
+    Access the user management interface to view and manage all platform users.
+    
+    Reference: AdminController.java:17
+  </Card>
+  
+  <Card title="Statistics & Metrics" icon="chart-line">
+    **GET** `/admin/stats`
+    
+    View platform-wide statistics, metrics, and analytics.
+    
+    Reference: AdminController.java:25
+  </Card>
+</CardGroup>
+
+## Admin Controller Structure
+
+The `AdminController` (AdminController.java:12) manages all administrative pages:
+
+```java
+@Controller
+@RequestMapping("/admin")
+public class AdminController {
+
+    // User management page
+    @GetMapping({ "/users" })
+    public String mostrarGestionUsuarios() {
+        return "admin/users";
+    }
+
+    // Statistics and metrics page
+    @GetMapping({ "/stats" })
+    public String mostrarEstadisticas() {
+        return "admin/stats";
+    }
+}
+```
+
+## Dashboard Features
+
+### User Management
+
+The user management section provides tools to:
+
+<CardGroup cols={2}>
+  <Card title="View All Users" icon="table">
+    Display comprehensive lists of all registered users with filtering and search capabilities.
+  </Card>
+  
+  <Card title="User Details" icon="address-card">
+    Access detailed information about each user including:
+    - Registration date
+    - Last login timestamp
+    - Assigned role
+    - Account status (active/inactive)
+  </Card>
+  
+  <Card title="Access Monitoring" icon="eye">
+    Track user login activity through AccessLog entries including timestamps, IP addresses, and success status.
+  </Card>
+  
+  <Card title="Role Management" icon="user-shield">
+    Assign and modify user roles (ADMIN, USER, PROFESSIONAL, MODERATOR) to control access permissions.
+  </Card>
+</CardGroup>
+
+### Platform Statistics
+
+The statistics page displays key metrics about platform activity:
+
+<AccordionGroup>
+  <Accordion title="User Statistics">
+    Track user-related metrics:
+    - Total registered users
+    - Active vs inactive accounts
+    - Users by role (Admin, Professional, User, Moderator)
+    - New registrations over time
+    - Last login activity
+  </Accordion>
+  
+  <Accordion title="Category Statistics">
+    Monitor category usage:
+    - Total categories
+    - Active vs inactive categories
+    - Categories by service request volume
+    - Popular service categories
+  </Accordion>
+  
+  <Accordion title="Service Request Metrics">
+    Analyze service request data:
+    - Total service requests
+    - Requests by status
+    - Requests by category
+    - Request completion rates
+  </Accordion>
+  
+  <Accordion title="Professional Analytics">
+    Track professional activity:
+    - Total professional profiles
+    - Professionals by category
+    - Service completion rates
+    - Professional ratings and reviews
+  </Accordion>
+</AccordionGroup>
+
+## Key Entities for Dashboard Data
+
+The dashboard aggregates data from multiple entities:
+
+### User Data (AppUser.java:22)
+
+```java
+@Entity
+public class AppUser extends BaseEntity {
+    private Long id;
+    private String firstName;
+    private String lastName;
+    private String username;  // Email address
+    private Boolean active;
+    private LocalDateTime registeredAt;
+    private LocalDateTime lastLoginAt;
+    private UserRole role;
+    // ...
+}
+```
+
+### Role Information (UserRole.java:20)
+
+```java
+@Entity
+public class UserRole extends BaseEntity {
+    public enum RoleName {
+        ADMIN, USER, PROFESSIONAL, MODERATOR
+    }
+    
+    private Long id;
+    private RoleName name;
+    private Boolean active;
+    
+    public int getUsersCount() {
+        return users != null ? users.size() : 0;
+    }
+}
+```
+
+### Category Metrics (Category.java:22)
+
+```java
+@Entity
+public class Category extends BaseEntity {
+    private Long id;
+    private String name;
+    private String description;
+    private Boolean active;
+    private List<ServiceRequest> requests;
+    private Set<ProfessionalProfile> professionals;
+}
+```
+
+### Access Logs (AccessLog.java:18)
+
+```java
+@Entity
+public class AccessLog {
+    private Long id;
+    private LocalDateTime accessedAt;
+    private String sourceIp;
+    private boolean success;
+    private AppUser user;
+}
+```
+
+## Dashboard Capabilities
+
+<Tabs>
+  <Tab title="Monitoring">
+    **Real-time Activity Tracking**
+    
+    - Monitor user login attempts through AccessLog entries
+    - Track failed login attempts for security analysis
+    - View recent user registrations
+    - Monitor active user sessions
+  </Tab>
+  
+  <Tab title="Management">
+    **Platform Administration**
+    
+    - Manage user accounts and roles
+    - Create, edit, and delete service categories
+    - Activate or deactivate user accounts
+    - Toggle category active status
+  </Tab>
+  
+  <Tab title="Analytics">
+    **Data Insights**
+    
+    - Analyze platform growth trends
+    - Identify popular service categories
+    - Track user engagement metrics
+    - Monitor professional performance
+  </Tab>
+  
+  <Tab title="Security">
+    **Access Control**
+    
+    - Review access logs for security threats
+    - Monitor failed login attempts
+    - Track IP addresses of access attempts
+    - Manage user permissions through roles
+  </Tab>
+</Tabs>
+
+## Navigation Between Admin Features
+
+The admin dashboard provides seamless navigation between different administrative functions:
+
+```
+/admin/
+├── /users          - User management interface
+├── /stats          - Statistics and metrics
+├── /categories     - Category management
+├── /edit/{id}      - Edit specific category
+├── /delete/{id}    - Delete category
+└── /toggle/{id}    - Toggle category status
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Regular Monitoring">
+    Check the statistics page regularly to stay informed about platform activity and identify trends or issues early.
+  </Step>
+  
+  <Step title="Security Audits">
+    Review access logs frequently to detect suspicious activity, such as multiple failed login attempts or unusual access patterns.
+  </Step>
+  
+  <Step title="User Management">
+    Keep user accounts up to date by deactivating unused accounts and ensuring roles are appropriately assigned.
+  </Step>
+  
+  <Step title="Category Optimization">
+    Analyze category usage statistics to optimize your category structure and ensure categories align with user needs.
+  </Step>
+  
+  <Step title="Performance Tracking">
+    Monitor key metrics over time to measure platform growth and identify areas for improvement.
+  </Step>
+</Steps>
+
+<Note>
+The dashboard leverages database indexes on key fields (user ID, timestamps, category names) to ensure fast query performance even with large datasets.
+</Note>
+
+## Related Resources
+
+- [Category Management](/guides/admin/category-management) - Detailed guide on managing categories
+- [User Oversight](/guides/admin/user-oversight) - Complete user management documentation
+- [Security Architecture](/architecture/security) - Platform security settings

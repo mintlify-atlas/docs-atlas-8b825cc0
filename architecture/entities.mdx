@@ -1,0 +1,690 @@
+---
+title: 'JPA Entity Reference'
+description: 'Complete reference for all JPA entities, their fields, relationships, and validations'
+icon: 'code'
+---
+
+## Base Entity
+
+All entities (except `AccessLog`) extend the `BaseEntity` class which provides automatic auditing.
+
+### BaseEntity
+
+**Package**: `es.duit.app.entity`
+
+```java
+@Data
+@MappedSuperclass
+@EntityListeners(AuditingEntityListener.class)
+public abstract class BaseEntity {
+    @CreatedBy
+    @Column(name = "created_by", length = 100, updatable = false)
+    private String createdBy;
+
+    @CreatedDate
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    @LastModifiedBy
+    @Column(name = "updated_by", length = 100)
+    private String updatedBy;
+
+    @LastModifiedDate
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+}
+```
+
+**Inherited Fields**:
+- `createdBy` - Username who created the record
+- `createdAt` - Timestamp when created
+- `updatedBy` - Username who last modified the record
+- `updatedAt` - Timestamp of last modification
+
+## User Management Entities
+
+### UserRole
+
+**Table**: `user_role`
+
+**Package**: `es.duit.app.entity.UserRole`
+
+Defines user roles for authorization.
+
+```java
+@Entity
+@Table(name = "user_role", indexes = {
+    @Index(name = "idx_role_name", columnList = "name"),
+    @Index(name = "idx_role_active", columnList = "active")
+})
+public class UserRole extends BaseEntity
+```
+
+<ParamField path="id" type="Long" required>
+  Primary key, auto-generated
+</ParamField>
+
+<ParamField path="name" type="RoleName" required>
+  Role name enum: ADMIN, USER, PROFESSIONAL, MODERATOR
+  - Stored as STRING in database
+  - Max length: 20 characters
+  - Must be unique
+</ParamField>
+
+<ParamField path="description" type="String">
+  Role description
+  - Max length: 100 characters
+</ParamField>
+
+<ParamField path="active" type="Boolean" required>
+  Whether the role is active
+  - Default: true
+</ParamField>
+
+**Relationships**:
+- `users`: OneToMany → AppUser (bidirectional)
+
+**Methods**:
+- `isActive()`: Returns true if role is active
+- `isAdmin()`: Returns true if role is ADMIN
+- `isProfessional()`: Returns true if role is PROFESSIONAL
+- `getUsersCount()`: Returns count of users with this role
+
+### AppUser
+
+**Table**: `app_user`
+
+**Package**: `es.duit.app.entity.AppUser`
+
+Core user entity for all application users.
+
+```java
+@Entity
+@Table(name = "app_user", indexes = {
+    @Index(name = "idx_user_username", columnList = "username"),
+    @Index(name = "idx_user_dni", columnList = "dni"),
+    @Index(name = "idx_user_active", columnList = "active"),
+    @Index(name = "idx_user_role", columnList = "id_role")
+})
+public class AppUser extends BaseEntity
+```
+
+<ParamField path="id" type="Long" required>
+  Primary key (id_user), auto-generated
+</ParamField>
+
+<ParamField path="firstName" type="String" required>
+  User's first name
+  - Min length: 2, Max length: 100
+  - Column: first_name
+</ParamField>
+
+<ParamField path="lastName" type="String" required>
+  User's last name
+  - Max length: 150
+  - Column: last_name
+</ParamField>
+
+<ParamField path="dni" type="String">
+  Spanish ID number
+  - Pattern: 8 digits + uppercase letter (e.g., 12345678A)
+  - Unique
+  - Max length: 9
+</ParamField>
+
+<ParamField path="username" type="String" required>
+  Email address (used for login)
+  - Must be valid email format
+  - Unique
+  - Max length: 100
+</ParamField>
+
+<ParamField path="password" type="String" required>
+  BCrypt hashed password
+  - Min length: 60 (BCrypt hash)
+  - Max length: 255
+  - Excluded from toString and equals/hashCode
+</ParamField>
+
+<ParamField path="phone" type="String">
+  Phone number
+  - Pattern: 9-15 digits, optional + prefix
+  - Max length: 20
+</ParamField>
+
+<ParamField path="active" type="Boolean" required>
+  Account active status
+  - Default: true
+</ParamField>
+
+<ParamField path="registeredAt" type="LocalDateTime">
+  Registration timestamp
+  - Auto-set on creation
+  - Column: registered_at
+</ParamField>
+
+<ParamField path="lastLoginAt" type="LocalDateTime">
+  Last successful login timestamp
+  - Column: last_login_at
+</ParamField>
+
+**Relationships**:
+- `role`: ManyToOne → UserRole (required, lazy loaded)
+- `address`: ManyToOne → Address (optional, lazy loaded)
+- `professionalProfile`: OneToOne → ProfessionalProfile (optional, cascade all)
+- `requests`: OneToMany → ServiceRequest (as client, cascade all)
+- `accessLogs`: OneToMany → AccessLog (cascade all)
+
+**Methods**:
+- `getFullName()`: Returns "firstName lastName"
+- `isProfessional()`: Returns true if user has a professional profile
+- `getEmail()`: Alias for username
+- `getDisplayName()`: Returns full name or username
+- `isAdmin()`: Returns true if user has ADMIN role
+
+**Lifecycle Hooks**:
+- `@PrePersist`: Sets `registeredAt` if null
+
+### ProfessionalProfile
+
+**Table**: `professional_profile`
+
+**Package**: `es.duit.app.entity.ProfessionalProfile`
+
+Extends user with professional service provider information.
+
+```java
+@Entity
+@Table(name = "professional_profile", indexes = {
+    @Index(name = "idx_professional_nif", columnList = "nif"),
+    @Index(name = "idx_professional_hourly_rate", columnList = "hourly_rate")
+})
+public class ProfessionalProfile extends BaseEntity
+```
+
+<ParamField path="id" type="Long" required>
+  Primary key (id_professional)
+  - Shared with AppUser.id via @MapsId
+</ParamField>
+
+<ParamField path="user" type="AppUser" required>
+  One-to-one relationship with AppUser
+  - Mapped by shared ID
+  - Lazy loaded
+</ParamField>
+
+<ParamField path="description" type="String" required>
+  Professional bio/description
+  - Min length: 50, Max length: 2000
+  - Stored as TEXT
+</ParamField>
+
+<ParamField path="hourlyRate" type="BigDecimal" required>
+  Hourly rate in EUR
+  - Min: 5.00, Max: 500.00
+  - Precision: 8, Scale: 2
+  - Column: hourly_rate
+</ParamField>
+
+<ParamField path="nif" type="String" required>
+  Tax ID number
+  - Pattern: 8 digits + uppercase letter
+  - Unique
+  - Max length: 9
+</ParamField>
+
+<ParamField path="registeredAt" type="LocalDateTime">
+  When professional profile was created
+  - Auto-set on creation
+  - Column: registered_at
+</ParamField>
+
+**Relationships**:
+- `user`: OneToOne → AppUser (required, shared primary key)
+- `applications`: OneToMany → JobApplication (cascade all)
+- `categories`: ManyToMany ↔ Category (via professional_category join table)
+
+**Lifecycle Hooks**:
+- `@PrePersist`: Sets `registeredAt` if null
+
+### Address
+
+**Table**: `address`
+
+**Package**: `es.duit.app.entity.Address`
+
+Physical address information.
+
+```java
+@Entity
+@Table(name = "address", indexes = {
+    @Index(name = "idx_address_city", columnList = "city"),
+    @Index(name = "idx_address_postal", columnList = "postal_code"),
+    @Index(name = "idx_address_province", columnList = "province"),
+    @Index(name = "idx_address_location", columnList = "city, province"),
+    @Index(name = "idx_address_full_location", columnList = "city, postal_code, province")
+})
+public class Address extends BaseEntity
+```
+
+<ParamField path="id" type="Long" required>
+  Primary key (id_address), auto-generated
+</ParamField>
+
+<ParamField path="address" type="String" required>
+  Street address
+  - Min length: 5, Max length: 200
+  - Column: street_address
+</ParamField>
+
+<ParamField path="city" type="String" required>
+  City name
+  - Min length: 2, Max length: 100
+</ParamField>
+
+<ParamField path="postalCode" type="String">
+  Postal code
+  - Pattern: Exactly 5 digits
+  - Column: postal_code
+</ParamField>
+
+<ParamField path="province" type="String" required>
+  Province/state name
+  - Min length: 2, Max length: 100
+</ParamField>
+
+<ParamField path="country" type="String" required>
+  Country name
+  - Min length: 2, Max length: 50
+  - Default: "España"
+</ParamField>
+
+**Relationships**:
+- `users`: OneToMany → AppUser
+- `serviceRequests`: OneToMany → ServiceRequest (as service address)
+
+**Methods**:
+- `getFullAddress()`: Returns formatted full address string
+
+### AccessLog
+
+**Table**: `access_log`
+
+**Package**: `es.duit.app.entity.AccessLog`
+
+Tracks user login attempts.
+
+```java
+@Entity
+@Table(name = "access_log", indexes = {
+    @Index(name = "idx_access_log_user", columnList = "id_user"),
+    @Index(name = "idx_access_log_accessed_at", columnList = "accessed_at")
+})
+public class AccessLog // Does NOT extend BaseEntity
+```
+
+<ParamField path="id" type="Long" required>
+  Primary key (id_log), auto-generated
+</ParamField>
+
+<ParamField path="accessedAt" type="LocalDateTime">
+  When access attempt occurred
+  - Auto-set on creation
+  - Column: accessed_at
+</ParamField>
+
+<ParamField path="sourceIp" type="String">
+  IP address of the request
+  - Max length: 45 (supports IPv6)
+  - Column: source_ip
+</ParamField>
+
+<ParamField path="success" type="boolean" required>
+  Whether login was successful
+  - Default: false
+</ParamField>
+
+<ParamField path="user" type="AppUser" required>
+  Reference to the user
+  - Lazy loaded
+  - Column: id_user
+</ParamField>
+
+**Lifecycle Hooks**:
+- `@PrePersist`: Sets `accessedAt` if null
+
+## Service Management Entities
+
+### Category
+
+**Table**: `category`
+
+**Package**: `es.duit.app.entity.Category`
+
+Service categories.
+
+```java
+@Entity
+@Table(name = "category", indexes = {
+    @Index(name = "idx_category_name", columnList = "name"),
+    @Index(name = "idx_category_active", columnList = "active")
+})
+public class Category extends BaseEntity
+```
+
+<ParamField path="id" type="Long" required>
+  Primary key (id_category), auto-generated
+</ParamField>
+
+<ParamField path="name" type="String" required>
+  Category name
+  - Min length: 2, Max length: 100
+  - Unique
+</ParamField>
+
+<ParamField path="description" type="String">
+  Category description
+  - Max length: 200
+</ParamField>
+
+<ParamField path="active" type="Boolean" required>
+  Whether category is active
+  - Default: true
+</ParamField>
+
+**Relationships**:
+- `requests`: OneToMany → ServiceRequest
+- `professionals`: ManyToMany ↔ ProfessionalProfile
+
+**Methods**:
+- `isActive()`: Returns true if category is active
+
+### ServiceRequest
+
+**Table**: `service_request`
+
+**Package**: `es.duit.app.entity.ServiceRequest`
+
+Service requests posted by clients.
+
+```java
+@Entity
+@Table(name = "service_request", indexes = {
+    @Index(name = "idx_request_category", columnList = "id_category"),
+    @Index(name = "idx_request_client", columnList = "id_client"),
+    @Index(name = "idx_request_status", columnList = "status"),
+    @Index(name = "idx_request_service_address", columnList = "id_service_address")
+})
+public class ServiceRequest extends BaseEntity
+```
+
+<ParamField path="id" type="Long" required>
+  Primary key (id_request), auto-generated
+</ParamField>
+
+<ParamField path="title" type="String" required>
+  Request title
+  - Min length: 5, Max length: 150
+</ParamField>
+
+<ParamField path="description" type="String" required>
+  Detailed description
+  - Min length: 20, Max length: 2000
+  - Stored as TEXT
+</ParamField>
+
+<ParamField path="requestedAt" type="LocalDateTime">
+  When request was created
+  - Auto-set on creation
+  - Column: requested_at
+</ParamField>
+
+<ParamField path="deadline" type="LocalDateTime">
+  Optional deadline for service completion
+</ParamField>
+
+<ParamField path="status" type="Status" required>
+  Request status enum: DRAFT, PUBLISHED, IN_PROGRESS, COMPLETED, CANCELLED, EXPIRED
+  - Default: DRAFT
+  - Stored as STRING
+</ParamField>
+
+**Relationships**:
+- `client`: ManyToOne → AppUser (required)
+- `category`: ManyToOne → Category (required)
+- `serviceAddress`: ManyToOne → Address (optional, cascade persist/merge)
+- `applications`: OneToMany → JobApplication (cascade all)
+- `jobs`: OneToMany → ServiceJob (cascade all)
+
+**Methods**:
+- `isActive()`: Returns true if status is PUBLISHED or IN_PROGRESS
+- `getApplicationCount()`: Returns number of applications
+- `getEffectiveServiceAddress()`: Returns service address or client's address
+- `hasSpecificServiceAddress()`: Returns true if specific service address is set
+
+**Lifecycle Hooks**:
+- `@PrePersist`: Sets `requestedAt` if null
+
+### JobApplication
+
+**Table**: `job_application`
+
+**Package**: `es.duit.app.entity.JobApplication`
+
+Applications from professionals to service requests.
+
+```java
+@Entity
+@Table(name = "job_application", indexes = {
+    @Index(name = "idx_application_request", columnList = "id_request"),
+    @Index(name = "idx_application_professional", columnList = "id_professional"),
+    @Index(name = "idx_application_status", columnList = "status"),
+    @Index(name = "idx_application_applied_at", columnList = "applied_at")
+})
+public class JobApplication extends BaseEntity
+```
+
+<ParamField path="id" type="Long" required>
+  Primary key (id_application), auto-generated
+</ParamField>
+
+<ParamField path="request" type="ServiceRequest" required>
+  The service request being applied to
+  - Lazy loaded
+  - Column: id_request
+</ParamField>
+
+<ParamField path="professional" type="ProfessionalProfile" required>
+  The professional applying
+  - Lazy loaded
+  - Column: id_professional
+</ParamField>
+
+<ParamField path="message" type="String">
+  Application message
+  - Max length: 1000
+  - Stored as TEXT
+</ParamField>
+
+<ParamField path="proposedPrice" type="BigDecimal">
+  Proposed price for the service
+  - Min: 0.00
+  - Precision: 8, Scale: 2
+  - Column: proposed_price
+</ParamField>
+
+<ParamField path="appliedAt" type="LocalDateTime">
+  When application was submitted
+  - Auto-set on creation
+  - Column: applied_at
+</ParamField>
+
+<ParamField path="respondedAt" type="LocalDateTime">
+  When client responded to application
+  - Column: responded_at
+</ParamField>
+
+<ParamField path="status" type="Status" required>
+  Application status enum: PENDING, ACCEPTED, REJECTED, WITHDRAWN
+  - Default: PENDING
+  - Stored as STRING
+</ParamField>
+
+**Relationships**:
+- `request`: ManyToOne → ServiceRequest (required)
+- `professional`: ManyToOne → ProfessionalProfile (required)
+- `job`: OneToOne → ServiceJob (bidirectional)
+
+**Lifecycle Hooks**:
+- `@PrePersist`: Sets `appliedAt` if null
+
+### ServiceJob
+
+**Table**: `service_job`
+
+**Package**: `es.duit.app.entity.ServiceJob`
+
+Active or completed jobs (accepted applications).
+
+```java
+@Entity
+@Table(name = "service_job", indexes = {
+    @Index(name = "idx_job_status", columnList = "status"),
+    @Index(name = "idx_job_request", columnList = "id_request"),
+    @Index(name = "idx_job_application", columnList = "id_application"),
+    @Index(name = "idx_job_dates", columnList = "start_date, end_date"),
+    @Index(name = "idx_job_active", columnList = "status, start_date"),
+    @Index(name = "idx_job_price", columnList = "agreed_price")
+})
+public class ServiceJob extends BaseEntity
+```
+
+<ParamField path="id" type="Long" required>
+  Primary key (id_job), auto-generated
+</ParamField>
+
+<ParamField path="agreedPrice" type="BigDecimal" required>
+  Final agreed price
+  - Min: 0.00
+  - Precision: 8, Scale: 2
+  - Column: agreed_price
+</ParamField>
+
+<ParamField path="startDate" type="LocalDateTime">
+  When job started
+  - Auto-set on creation if null
+  - Column: start_date
+</ParamField>
+
+<ParamField path="endDate" type="LocalDateTime">
+  When job was completed
+  - Column: end_date
+</ParamField>
+
+<ParamField path="notes" type="String">
+  Additional notes
+  - Max length: 2000
+  - Stored as TEXT
+</ParamField>
+
+<ParamField path="status" type="Status" required>
+  Job status enum: CREATED, IN_PROGRESS, COMPLETED, CANCELLED, PAUSED
+  - Default: CREATED
+  - Stored as STRING
+</ParamField>
+
+**Relationships**:
+- `request`: ManyToOne → ServiceRequest (required)
+- `application`: ManyToOne → JobApplication (required)
+- `ratings`: OneToMany → Rating (cascade all)
+
+**Methods**:
+- `isActive()`: Returns true if status is CREATED or IN_PROGRESS
+- `isCompleted()`: Returns true if status is COMPLETED
+- `getClient()`: Returns the client from the request
+- `getProfessional()`: Returns the professional from the application
+
+**Lifecycle Hooks**:
+- `@PrePersist`: Sets `startDate` to now if null
+
+### Rating
+
+**Table**: `rating`
+
+**Package**: `es.duit.app.entity.Rating`
+
+Ratings and reviews after job completion.
+
+```java
+@Entity
+@Table(name = "rating", indexes = {
+    @Index(name = "idx_rating_job", columnList = "id_job"),
+    @Index(name = "idx_rating_type", columnList = "type")
+})
+public class Rating extends BaseEntity
+```
+
+<ParamField path="id" type="Long" required>
+  Primary key (id_rating), auto-generated
+</ParamField>
+
+<ParamField path="job" type="ServiceJob" required>
+  The job being rated
+  - Lazy loaded
+  - Column: id_job
+</ParamField>
+
+<ParamField path="type" type="Type" required>
+  Rating direction enum: CLIENT_TO_PROFESSIONAL, PROFESSIONAL_TO_CLIENT
+  - Stored as STRING
+  - Max length: 30
+</ParamField>
+
+<ParamField path="score" type="Integer" required>
+  Rating score
+  - Min: 1, Max: 5
+</ParamField>
+
+<ParamField path="comment" type="String">
+  Optional comment
+  - Max length: 500
+</ParamField>
+
+<ParamField path="ratedAt" type="LocalDateTime">
+  When rating was given
+  - Auto-set on creation
+  - Column: rated_at
+</ParamField>
+
+<ParamField path="status" type="Status" required>
+  Rating status enum: PENDING, PUBLISHED, HIDDEN
+  - Default: PENDING
+  - Stored as STRING
+</ParamField>
+
+**Relationships**:
+- `job`: ManyToOne → ServiceJob (required)
+
+**Methods**:
+- `isPositive()`: Returns true if score >= 4
+- `getSender()`: Returns the user who gave the rating
+- `getReceiver()`: Returns the user who received the rating
+
+**Lifecycle Hooks**:
+- `@PrePersist`: Sets `ratedAt` if null
+
+## Validation Summary
+
+All entities use Jakarta Bean Validation annotations:
+
+- `@NotNull` - Field cannot be null
+- `@NotBlank` - String cannot be null, empty, or whitespace
+- `@Size` - String length constraints
+- `@Min` / `@Max` - Numeric range constraints
+- `@DecimalMin` / `@DecimalMax` - BigDecimal range constraints
+- `@Email` - Valid email format
+- `@Pattern` - Regular expression validation
+
+<Note>
+Validations are automatically applied by Spring on controller inputs when using `@Valid` or `@Validated`.
+</Note>

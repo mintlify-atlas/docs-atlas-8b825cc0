@@ -1,0 +1,398 @@
+---
+title: 'Controller Documentation'
+description: 'Overview of all controller classes and their responsibilities'
+---
+
+# Controller Documentation
+
+Controllers handle HTTP requests and coordinate between views and services. All controllers in Duit follow Spring MVC patterns.
+
+## Controller Organization
+
+Controllers are organized by functional area:
+
+```
+controller/
+├── PublicController.java          # Public pages (no auth required)
+├── DashboardController.java       # Main dashboard
+├── ProfileController.java         # User profile management
+├── RequestFormController.java     # Request creation/editing
+├── MyRequestsController.java      # User's requests management
+├── ProfessionalController.java    # Professional features
+├── PostulacionesController.java   # Application management
+├── RatingsController.java         # Rating submission
+├── SharedController.java          # Shared authenticated pages
+├── AdminController.java           # Admin dashboard
+├── CategoryController.java        # Category CRUD
+├── CustomErrorController.java     # Error pages
+└── UserControllerAdvice.java      # Global controller advice
+```
+
+---
+
+## Public Access Controllers
+
+### PublicController
+**Location:** `es.duit.app.controller.PublicController`
+
+**Request Mapping:** Root level (`/`)
+
+**Responsibilities:**
+- Landing page
+- Login/logout pages
+- User registration
+- Static pages (terms, privacy, help)
+
+**Key Features:**
+- Redirects authenticated users from login page
+- Handles registration form validation
+- Preserves form data on validation errors
+- Displays flash messages for success/error states
+
+**View Templates:**
+- `public/index` - Landing page
+- `public/login` - Login form
+- `public/signup` - Registration form
+- `public/terms` - Terms and conditions
+- `public/privacy` - Privacy policy
+- `public/help` - Help page
+
+---
+
+### DashboardController
+**Location:** `es.duit.app.controller.DashboardController`
+
+**Request Mapping:** `/home`
+
+**Responsibilities:**
+- Main dashboard page for authenticated users
+
+**View Templates:**
+- `dashboard/home` - Main dashboard
+
+---
+
+## User Management Controllers
+
+### ProfileController
+**Location:** `es.duit.app.controller.ProfileController`
+
+**Request Mapping:** `/profile`
+
+**Responsibilities:**
+- User profile viewing and editing
+- Professional profile management
+- Account deletion (deactivation)
+
+**Key Features:**
+- Separate forms for user and professional profiles
+- Validation groups for different profile types
+- Secure account deletion with logout
+
+**View Templates:**
+- `profile/profileUser` - User profile edit
+- `profile/profileProfessional` - Professional profile edit
+
+**DTO Used:** `EditProfileDTO` with validation groups
+
+---
+
+## Service Request Controllers
+
+### RequestFormController
+**Location:** `es.duit.app.controller.RequestFormController`
+
+**Request Mapping:** `/requests`
+
+**Responsibilities:**
+- Display request creation/editing form
+- Handle form submission
+- Manage address selection (habitual vs new)
+
+**Key Features:**
+- Single form for both create and edit operations
+- Edit mode detected via `edit` query parameter
+- Address options: use habitual or specify new
+- Deadline date handling
+- Category selection
+- Publish immediately or save as draft
+
+**View Templates:**
+- `jobs/request` - Request form
+
+**Flow:**
+1. GET `/requests/request` - Show empty form (create)
+2. GET `/requests/request?edit={id}` - Show form with data (edit)
+3. POST `/requests/request` - Process submission
+
+---
+
+### MyRequestsController
+**Location:** `es.duit.app.controller.MyRequestsController`
+
+**Request Mapping:** `/requests`
+
+**Responsibilities:**
+- Display user's service requests
+- Manage request states (publish, unpublish, cancel, reactivate, delete)
+- View applications for requests
+- Accept/reject applications
+- Manage jobs as client (complete, pause, cancel)
+
+**Key Features:**
+- Lists all user's requests with their status
+- Shows active jobs as client
+- Application management
+- Job state transitions
+
+**View Templates:**
+- `jobs/myrequest` - List of user's requests
+- `jobs/applications` - Applications for a specific request
+
+**Request States:**
+- DRAFT → PUBLISHED → (COMPLETED | CANCELLED)
+- Cancelled requests can be reactivated to DRAFT
+
+---
+
+## Professional Controllers
+
+### ProfessionalController
+**Location:** `es.duit.app.controller.ProfessionalController`
+
+**Request Mapping:** `/professional`
+
+**Responsibilities:**
+- Search for available service requests
+- Submit applications to requests
+- View own applications
+- Manage application states
+
+**Key Features:**
+- Advanced search with filters (text, category, postal code)
+- Application submission with price and message
+- Edit pending applications
+- Withdraw pending applications
+- View active jobs as professional
+
+**View Templates:**
+- `jobs/search` - Search page with filters
+- `jobs/myaplication` - Professional's applications and jobs
+
+**Search Filters:**
+- `textoBusqueda` - Search in title/description
+- `categoriaId` - Filter by category
+- `codigoPostal` - Filter by postal code
+
+---
+
+### PostulacionesController
+**Location:** `es.duit.app.controller.PostulacionesController`
+
+**Request Mapping:** `/jobs/applications`
+
+**Responsibilities:**
+- View applications for a request (client view)
+- Accept/reject applications
+- Manage job lifecycle as professional
+
+**Key Features:**
+- Application acceptance creates a job
+- Job state management (start, pause, resume, complete, cancel)
+- Redirect parameter support for flexible navigation
+
+**Job States:**
+- CREATED → IN_PROGRESS ↔ PAUSED → COMPLETED
+- CANCELLED (can be set from any state)
+
+**View Templates:**
+- `jobs/applications` - View applications
+
+---
+
+## Rating Controllers
+
+### RatingsController
+**Location:** `es.duit.app.controller.RatingsController`
+
+**Request Mapping:** `/ratings`
+
+**Responsibilities:**
+- Submit ratings for completed jobs
+
+**Key Features:**
+- Score validation (1-5)
+- Optional comment
+- Automatic rating type detection (client rates professional or vice versa)
+
+**Related Views:**
+- Ratings are displayed in `shared/ratings`
+- Submission redirects to ratings page
+
+---
+
+## Shared Controllers
+
+### SharedController
+**Location:** `es.duit.app.controller.SharedController`
+
+**Request Mapping:** `/shared`
+
+**Responsibilities:**
+- Display job history
+- Display ratings page (pending and completed)
+
+**Key Features:**
+- History shows jobs as both client and professional
+- Ratings page shows pending ratings and completed ratings
+- Professional profile includes rating statistics
+
+**View Templates:**
+- `shared/history` - Job history
+- `shared/ratings` - Ratings overview
+
+---
+
+## Administration Controllers
+
+### AdminController
+**Location:** `es.duit.app.controller.AdminController`
+
+**Request Mapping:** `/admin`
+
+**Responsibilities:**
+- User management page (view only, no CRUD)
+- Statistics page (placeholder)
+
+**View Templates:**
+- `admin/users` - User list
+- `admin/stats` - Statistics dashboard
+
+---
+
+### CategoryController
+**Location:** `es.duit.app.controller.CategoryController`
+
+**Request Mapping:** `/admin`
+
+**Responsibilities:**
+- Complete CRUD operations for categories
+- Toggle category active/inactive status
+
+**Key Features:**
+- List all categories
+- Create new category
+- Edit existing category
+- Delete category
+- Toggle active status
+
+**View Templates:**
+- `admin/categories` - Category management
+
+**Operations:**
+- GET `/admin/categories` - List view
+- POST `/admin/categories` - Create/update
+- GET `/admin/edit/{id}` - Load for editing
+- GET `/admin/delete/{id}` - Delete
+- GET `/admin/toggle/{id}` - Toggle status
+
+---
+
+## Error Handling
+
+### CustomErrorController
+**Location:** `es.duit.app.controller.CustomErrorController`
+
+**Implements:** Spring Boot's `ErrorController`
+
+**Responsibilities:**
+- Handle HTTP errors (403, 404, 500)
+- Display custom error pages
+
+**View Templates:**
+- `error/403` - Forbidden
+- `error/404` - Not Found
+- `error/500` - Server Error
+
+---
+
+## Global Controller Advice
+
+### UserControllerAdvice
+**Location:** `es.duit.app.controller.UserControllerAdvice`
+
+**Annotation:** `@ControllerAdvice`
+
+**Responsibilities:**
+- Add authenticated user to all views automatically
+
+**Model Attributes:**
+- `usuario` - Current authenticated user (or null if not authenticated)
+
+**Usage in Views:**
+```html
+<span th:text="${usuario.firstName}">User Name</span>
+```
+
+---
+
+## Common Patterns
+
+### Flash Attributes
+Controllers use flash attributes for temporary messages:
+```java
+redirectAttributes.addFlashAttribute("success", "Operation successful");
+redirectAttributes.addFlashAttribute("error", "Error message");
+```
+
+### Model Attributes
+`@ModelAttribute` methods initialize form objects:
+```java
+@ModelAttribute("form")
+public RequestDTO initializeForm() {
+    return new RequestDTO();
+}
+```
+
+### Validation
+Validation uses `@Valid` with `BindingResult`:
+```java
+public String submit(@Valid @ModelAttribute RequestDTO form,
+                     BindingResult bindingResult) {
+    if (bindingResult.hasErrors()) {
+        return "form-view";
+    }
+    // Process form
+}
+```
+
+### Authentication
+Authenticated user is obtained via `Authentication` parameter:
+```java
+public String action(Authentication auth) {
+    AppUser user = authService.getAuthenticatedUser(auth);
+    // Use user
+}
+```
+
+---
+
+## Security Configuration
+
+Access control is configured in Spring Security:
+
+- `/admin/**` - Requires ADMIN role
+- `/professional/**` - Requires PROFESSIONAL role  
+- `/user/**`, `/shared/**`, `/profile/**` - Requires authentication
+- `/`, `/login`, `/signup`, `/error/**` - Public access
+
+---
+
+## Response Types
+
+Controllers primarily return:
+- **View names** (`String`) - For page rendering
+- **Redirects** (`redirect:/path`) - After form submissions
+- **Flash attributes** - For temporary messages
+
+No REST API endpoints (JSON/XML) are currently implemented.

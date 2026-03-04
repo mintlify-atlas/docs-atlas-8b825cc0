@@ -1,0 +1,280 @@
+---
+title: Key features
+description: Explore the core features that make Duit a comprehensive platform for connecting clients with service professionals
+---
+
+Duit provides a complete ecosystem for service marketplace operations, with features tailored for clients, professionals, and administrators.
+
+## Role-based access control
+
+Duit implements a secure, multi-role authentication system powered by Spring Security.
+
+<CardGroup cols={2}>
+  <Card title="User roles" icon="users">
+    Four distinct roles: ADMIN, USER, PROFESSIONAL, and MODERATOR
+  </Card>
+  <Card title="Secure authentication" icon="lock">
+    BCrypt password encryption and session management
+  </Card>
+</CardGroup>
+
+```java
+public enum RoleName {
+    ADMIN, USER, PROFESSIONAL, MODERATOR
+}
+```
+
+Each user account is assigned a role that determines their access to features and pages throughout the platform. Role-based routing ensures users only access functionality appropriate to their account type.
+
+<Note>
+  Users with a `ProfessionalProfile` gain access to professional-specific features like viewing applications and managing jobs.
+</Note>
+
+## Professional profiles
+
+Professionals can create detailed profiles that showcase their expertise and set their rates.
+
+### Profile requirements
+
+Professional profiles require specific information to ensure trust and transparency:
+
+- **Professional description**: 50-2000 characters describing services and experience
+- **Hourly rate**: Set between €5.00 and €500.00 per hour
+- **NIF (Tax ID)**: Required for legal compliance (format: 8 digits + letter)
+- **Service categories**: Select multiple categories of expertise
+
+```java
+@DecimalMin(value = "5.00", message = "La tarifa por hora mínima es 5€")
+@DecimalMax(value = "500.00", message = "La tarifa por hora máxima es 500€")
+@Column(name = "hourly_rate", precision = 8, scale = 2, nullable = false)
+private BigDecimal hourlyRate;
+```
+
+### Category specialization
+
+Professionals can associate their profile with multiple service categories, making them discoverable by clients searching for specific services.
+
+<Tip>
+  The many-to-many relationship between professionals and categories allows for flexible service offerings.
+</Tip>
+
+## Service request workflow
+
+Clients can create detailed service requests that professionals can discover and apply to.
+
+### Request lifecycle
+
+Service requests move through a defined lifecycle with six states:
+
+<Steps>
+  <Step title="DRAFT">
+    Request is being created but not yet visible to professionals
+  </Step>
+  <Step title="PUBLISHED">
+    Request is live and accepting applications from professionals
+  </Step>
+  <Step title="IN_PROGRESS">
+    A professional has been selected and work has begun
+  </Step>
+  <Step title="COMPLETED">
+    The job has been finished and awaits ratings
+  </Step>
+  <Step title="CANCELLED">
+    The request was cancelled by the client or professional
+  </Step>
+  <Step title="EXPIRED">
+    The request deadline passed without completion
+  </Step>
+</Steps>
+
+### Creating a request
+
+When creating a service request, clients provide:
+
+- **Title**: 5-150 characters describing the service needed
+- **Description**: 20-2000 characters with detailed requirements
+- **Category**: Select the type of service required
+- **Service location**: Use default address or specify a custom location
+- **Deadline**: Optional deadline for service completion
+
+```java
+@NotBlank(message = "El título es obligatorio")
+@Size(min = 5, max = 150)
+@Column(name = "title", length = 150, nullable = false)
+private String title;
+```
+
+<Note>
+  Requests can be saved as drafts and published later, or published immediately upon creation.
+</Note>
+
+## Job application system
+
+Professionals can submit applications to service requests they're interested in fulfilling.
+
+### Application components
+
+Each application includes:
+
+- **Message**: Optional cover message (up to 1000 characters)
+- **Proposed price**: The professional's quote for the service
+- **Application status**: PENDING, ACCEPTED, REJECTED, or WITHDRAWN
+
+```java
+public enum Status {
+    PENDING, ACCEPTED, REJECTED, WITHDRAWN
+}
+```
+
+### Application flow
+
+<Steps>
+  <Step title="Professional applies">
+    Professional submits application with proposed price and message
+  </Step>
+  <Step title="Client reviews">
+    Client views all applications and compares proposals
+  </Step>
+  <Step title="Client decides">
+    Client accepts one application and others are automatically rejected
+  </Step>
+  <Step title="Job created">
+    An accepted application becomes a ServiceJob with agreed price
+  </Step>
+</Steps>
+
+## Job management
+
+Once an application is accepted, it becomes a ServiceJob that both parties can manage.
+
+### Job states
+
+Jobs progress through multiple states during their lifecycle:
+
+- **CREATED**: Job just accepted, ready to begin
+- **IN_PROGRESS**: Professional is actively working on the job
+- **PAUSED**: Work temporarily stopped
+- **COMPLETED**: Job finished and ready for ratings
+- **CANCELLED**: Job terminated before completion
+
+### Job controls
+
+Both clients and professionals have controls to manage jobs:
+
+<CardGroup cols={2}>
+  <Card title="Professional actions" icon="hammer">
+    Start, pause, resume, and complete jobs
+  </Card>
+  <Card title="Client actions" icon="user">
+    Monitor progress and cancel if needed
+  </Card>
+</CardGroup>
+
+```java
+public boolean isActive() {
+    return status == Status.CREATED || status == Status.IN_PROGRESS;
+}
+```
+
+## Rating system
+
+After job completion, both parties can rate their experience, building reputation on the platform.
+
+### Bidirectional ratings
+
+Duit implements a two-way rating system:
+
+- **CLIENT_TO_PROFESSIONAL**: Clients rate the quality of service received
+- **PROFESSIONAL_TO_CLIENT**: Professionals rate their experience with the client
+
+```java
+public enum Type {
+    CLIENT_TO_PROFESSIONAL, PROFESSIONAL_TO_CLIENT
+}
+```
+
+### Rating components
+
+Each rating consists of:
+
+- **Score**: 1-5 stars
+- **Comment**: Optional text feedback (up to 500 characters)
+- **Status**: PENDING, PUBLISHED, or HIDDEN
+
+<Tip>
+  Ratings are marked as "positive" when the score is 4 or 5, helping users quickly identify highly-rated professionals.
+</Tip>
+
+### Reputation building
+
+```java
+public boolean isPositive() {
+    return score >= 4;
+}
+```
+
+Published ratings appear on professional profiles, helping clients make informed decisions when choosing service providers.
+
+## Location-based matching
+
+Service addresses enable location-based service delivery and professional matching.
+
+### Address handling
+
+Each service request can use:
+
+- **User's default address**: Stored in the user profile
+- **Custom service address**: Specified for a specific request
+
+```java
+public Address getEffectiveServiceAddress() {
+    return serviceAddress != null ? serviceAddress : 
+           (client != null ? client.getAddress() : null);
+}
+```
+
+### Address structure
+
+Addresses include:
+
+- Street address
+- City
+- Postal code (5 digits)
+- Province
+- Country (defaults to España)
+
+<Note>
+  Location indexing in the database enables efficient searching and filtering of requests by geographic area.
+</Note>
+
+## Admin dashboard
+
+Administrators have access to platform management tools.
+
+### Administrative features
+
+<CardGroup cols={2}>
+  <Card title="Category management" icon="tags">
+    Full CRUD operations for service categories
+  </Card>
+  <Card title="User oversight" icon="users-viewfinder">
+    View and monitor user accounts and activity
+  </Card>
+  <Card title="Statistics" icon="chart-line">
+    Access platform metrics and usage data
+  </Card>
+  <Card title="Access logs" icon="file-lines">
+    Track user authentication and activity
+  </Card>
+</CardGroup>
+
+### Category management
+
+Administrators can create, edit, activate, and deactivate service categories. Active categories appear in request creation forms and professional profile settings.
+
+```java
+@Column(name = "active", nullable = false)
+private Boolean active = true;
+```
+
+Categories are the foundation of the platform's service taxonomy, enabling organized discovery and matching.

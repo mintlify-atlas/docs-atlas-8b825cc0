@@ -1,0 +1,548 @@
+---
+title: 'Testing Guide'
+description: 'Guide to running tests and understanding the test structure in Duit'
+---
+
+# Testing Guide
+
+This guide covers testing practices and how to run tests for the Duit application.
+
+## Table of Contents
+
+- [Test Structure](#test-structure)
+- [Running Tests](#running-tests)
+- [Writing Tests](#writing-tests)
+- [Test Coverage](#test-coverage)
+- [Manual Testing](#manual-testing)
+
+---
+
+## Test Structure
+
+### Test Directory Layout
+
+Tests are located in the standard Maven test directory:
+
+```
+src/
+└── test/
+    └── java/
+        └── es/duit/app/
+            ├── controller/     # Controller tests
+            ├── service/        # Service layer tests
+            ├── repository/     # Repository tests
+            └── integration/    # Integration tests
+```
+
+### Testing Dependencies
+
+The project includes the following testing dependencies (from `pom.xml`):
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-test</artifactId>
+    <scope>test</scope>
+</dependency>
+
+<dependency>
+    <groupId>org.springframework.security</groupId>
+    <artifactId>spring-security-test</artifactId>
+    <scope>test</scope>
+</dependency>
+```
+
+This includes:
+- JUnit 5 (Jupiter)
+- Spring Boot Test
+- Spring Security Test
+- Mockito
+- AssertJ
+- Hamcrest
+
+---
+
+## Running Tests
+
+### Running All Tests
+
+**Using Maven:**
+```bash
+./mvnw test
+```
+
+**On Windows:**
+```bash
+mvnw.cmd test
+```
+
+### Running Specific Test Classes
+
+```bash
+./mvnw test -Dtest=UserServiceTest
+```
+
+### Running Specific Test Methods
+
+```bash
+./mvnw test -Dtest=UserServiceTest#testUserRegistration
+```
+
+### Skip Tests During Build
+
+```bash
+./mvnw clean package -DskipTests
+```
+
+### Running Tests in IDE
+
+**IntelliJ IDEA:**
+- Right-click on test class or method
+- Select "Run 'TestName'"
+
+**Eclipse:**
+- Right-click on test class
+- Select "Run As" → "JUnit Test"
+
+---
+
+## Writing Tests
+
+### Unit Tests
+
+Unit tests focus on testing individual components in isolation.
+
+#### Service Layer Test Example
+
+```java
+@ExtendWith(MockitoExtension.class)
+class UserServiceTest {
+    
+    @Mock
+    private AppUserRepository userRepository;
+    
+    @Mock
+    private PasswordEncoder passwordEncoder;
+    
+    @InjectMocks
+    private RegistroService registroService;
+    
+    @Test
+    void testRegisterUser_Success() {
+        // Given
+        RegistroDTO dto = new RegistroDTO();
+        dto.setEmail("test@example.com");
+        dto.setPassword("password123");
+        dto.setFirstName("John");
+        dto.setLastName("Doe");
+        dto.setDni("12345678A");
+        dto.setUserType("USER");
+        
+        when(userRepository.findByUsername(anyString()))
+            .thenReturn(Optional.empty());
+        when(passwordEncoder.encode(anyString()))
+            .thenReturn("encodedPassword");
+        
+        // When
+        AppUser result = registroService.registerUser(dto);
+        
+        // Then
+        assertNotNull(result);
+        assertEquals("test@example.com", result.getUsername());
+        verify(userRepository).save(any(AppUser.class));
+    }
+    
+    @Test
+    void testRegisterUser_DuplicateEmail_ThrowsException() {
+        // Given
+        RegistroDTO dto = new RegistroDTO();
+        dto.setEmail("existing@example.com");
+        
+        when(userRepository.findByUsername(anyString()))
+            .thenReturn(Optional.of(new AppUser()));
+        
+        // When/Then
+        assertThrows(IllegalArgumentException.class, () -> {
+            registroService.registerUser(dto);
+        });
+    }
+}
+```
+
+#### Repository Test Example
+
+```java
+@DataJpaTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+class ServiceRequestRepositoryTest {
+    
+    @Autowired
+    private ServiceRequestRepository repository;
+    
+    @Autowired
+    private TestEntityManager entityManager;
+    
+    @Test
+    void testFindByClientUsername() {
+        // Given
+        AppUser user = new AppUser();
+        user.setUsername("test@example.com");
+        entityManager.persist(user);
+        
+        ServiceRequest request = new ServiceRequest();
+        request.setClient(user);
+        request.setTitle("Test Request");
+        entityManager.persist(request);
+        entityManager.flush();
+        
+        // When
+        List<ServiceRequest> results = 
+            repository.findByClientUsername("test@example.com");
+        
+        // Then
+        assertFalse(results.isEmpty());
+        assertEquals("Test Request", results.get(0).getTitle());
+    }
+}
+```
+
+### Integration Tests
+
+Integration tests verify that multiple components work together correctly.
+
+```java
+@SpringBootTest
+@AutoConfigureMockMvc
+class RequestControllerIntegrationTest {
+    
+    @Autowired
+    private MockMvc mockMvc;
+    
+    @Test
+    @WithMockUser(username = "test@example.com", roles = "USER")
+    void testShowRequestForm() throws Exception {
+        mockMvc.perform(get("/requests/request"))
+            .andExpect(status().isOk())
+            .andExpect(view().name("jobs/request"))
+            .andExpect(model().attributeExists("form"))
+            .andExpect(model().attributeExists("categorias"));
+    }
+    
+    @Test
+    @WithMockUser(username = "test@example.com", roles = "USER")
+    void testSubmitRequestForm_Valid() throws Exception {
+        mockMvc.perform(post("/requests/request")
+                .param("title", "Test Request")
+                .param("description", "Test Description")
+                .param("categoryId", "1")
+                .param("addressOption", "habitual")
+                .with(csrf()))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/requests/my-requests"))
+            .andExpect(flash().attributeExists("success"));
+    }
+}
+```
+
+### Controller Tests with Security
+
+```java
+@WebMvcTest(ProfileController.class)
+class ProfileControllerTest {
+    
+    @Autowired
+    private MockMvc mockMvc;
+    
+    @MockBean
+    private AppUserService userService;
+    
+    @Test
+    @WithMockUser(username = "test@example.com")
+    void testEditProfile() throws Exception {
+        AppUser user = new AppUser();
+        user.setUsername("test@example.com");
+        user.setFirstName("John");
+        
+        when(userService.getCurrentUser()).thenReturn(user);
+        
+        mockMvc.perform(get("/profile/edit"))
+            .andExpect(status().isOk())
+            .andExpect(view().name("profile/profileUser"))
+            .andExpect(model().attributeExists("editProfileDTO"));
+    }
+}
+```
+
+---
+
+## Test Best Practices
+
+### Naming Conventions
+
+**Test Classes:**
+- Service tests: `{ClassName}Test`
+- Integration tests: `{ClassName}IntegrationTest`
+
+**Test Methods:**
+- Pattern: `test{MethodName}_{Scenario}_{ExpectedResult}`
+- Examples:
+  - `testRegisterUser_ValidData_ReturnsUser`
+  - `testSaveRequest_InvalidCategory_ThrowsException`
+  - `testPublishRequest_DraftStatus_ChangeToPublished`
+
+### AAA Pattern (Arrange-Act-Assert)
+
+Structure tests using the AAA pattern:
+
+```java
+@Test
+void testMethodName() {
+    // Arrange (Given)
+    // Set up test data and mocks
+    
+    // Act (When)
+    // Execute the method being tested
+    
+    // Assert (Then)
+    // Verify the results
+}
+```
+
+### Test Data Management
+
+**Use test data builders:**
+```java
+public class TestDataBuilder {
+    public static AppUser createTestUser(String email) {
+        AppUser user = new AppUser();
+        user.setUsername(email);
+        user.setFirstName("Test");
+        user.setLastName("User");
+        user.setDni("12345678A");
+        user.setActive(true);
+        return user;
+    }
+}
+```
+
+### Mocking Guidelines
+
+1. **Mock external dependencies** - Database, external APIs
+2. **Don't mock the class under test** - Test real implementation
+3. **Verify important interactions** - Use `verify()` when needed
+4. **Use argument matchers carefully** - Prefer exact values when possible
+
+---
+
+## Test Coverage
+
+### Measuring Coverage
+
+Add JaCoCo plugin to `pom.xml`:
+
+```xml
+<plugin>
+    <groupId>org.jacoco</groupId>
+    <artifactId>jacoco-maven-plugin</artifactId>
+    <version>0.8.11</version>
+    <executions>
+        <execution>
+            <goals>
+                <goal>prepare-agent</goal>
+            </goals>
+        </execution>
+        <execution>
+            <id>report</id>
+            <phase>test</phase>
+            <goals>
+                <goal>report</goal>
+            </goals>
+        </execution>
+    </executions>
+</plugin>
+```
+
+Generate coverage report:
+```bash
+./mvnw test jacoco:report
+```
+
+View report at: `target/site/jacoco/index.html`
+
+### Coverage Goals
+
+- **Services**: Aim for 80%+ coverage
+- **Controllers**: Test happy path and error cases
+- **Repositories**: Test custom queries
+- **Utilities**: Aim for 100% coverage
+
+---
+
+## Manual Testing
+
+### Test User Accounts
+
+Create test users with different roles for manual testing:
+
+```sql
+-- Admin user
+INSERT INTO app_user (username, password, first_name, last_name, dni, role_id, active)
+VALUES ('admin@test.com', '$2a$10$...', 'Admin', 'User', '11111111A', 1, true);
+
+-- Regular user
+INSERT INTO app_user (username, password, first_name, last_name, dni, role_id, active)
+VALUES ('user@test.com', '$2a$10$...', 'Test', 'User', '22222222B', 2, true);
+
+-- Professional user
+INSERT INTO app_user (username, password, first_name, last_name, dni, role_id, active)
+VALUES ('pro@test.com', '$2a$10$...', 'Pro', 'User', '33333333C', 3, true);
+```
+
+### Manual Testing Checklist
+
+**User Registration:**
+- [ ] Register as USER
+- [ ] Register as PROFESSIONAL
+- [ ] Test with duplicate email
+- [ ] Test with duplicate DNI
+- [ ] Test with invalid email format
+- [ ] Test password requirements
+
+**Authentication:**
+- [ ] Login with valid credentials
+- [ ] Login with invalid credentials
+- [ ] Logout
+- [ ] Access restricted pages without auth
+
+**Service Requests (as USER):**
+- [ ] Create draft request
+- [ ] Create and publish request
+- [ ] Edit draft request
+- [ ] Publish draft request
+- [ ] Unpublish request
+- [ ] Cancel request
+- [ ] Delete request
+- [ ] View applications
+- [ ] Accept application
+- [ ] Reject application
+
+**Professional Features:**
+- [ ] Search for requests
+- [ ] Apply to request
+- [ ] Edit application
+- [ ] Withdraw application
+- [ ] Start job
+- [ ] Pause job
+- [ ] Resume job
+- [ ] Complete job
+
+**Ratings:**
+- [ ] Submit rating as client
+- [ ] Submit rating as professional
+- [ ] View rating history
+
+**Admin Features:**
+- [ ] View users list
+- [ ] Create category
+- [ ] Edit category
+- [ ] Delete category
+- [ ] Toggle category status
+
+### Browser Testing
+
+Test on multiple browsers:
+- Chrome/Chromium
+- Firefox
+- Safari (if available)
+- Edge
+
+### Mobile Testing
+
+Test responsive design:
+- Mobile viewport (320px - 480px)
+- Tablet viewport (768px - 1024px)
+- Desktop viewport (1280px+)
+
+---
+
+## Continuous Integration
+
+### GitHub Actions Example
+
+Create `.github/workflows/test.yml`:
+
+```yaml
+name: Tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: duit_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up JDK 21
+      uses: actions/setup-java@v3
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+    
+    - name: Run tests
+      run: ./mvnw test
+      env:
+        DB_URL: jdbc:postgresql://localhost:5432/duit_test
+        DB_USER: test
+        DB_PASS: test
+```
+
+---
+
+## Troubleshooting Tests
+
+### Common Issues
+
+**Test fails with "No bean found":**
+- Add `@MockBean` for required dependencies
+- Use `@SpringBootTest` for full application context
+
+**Database connection issues:**
+- Check database is running
+- Verify connection properties
+- Use `@Transactional` to rollback test data
+
+**Authentication issues in tests:**
+- Use `@WithMockUser` annotation
+- Include CSRF token with `with(csrf())`
+
+**Flaky tests:**
+- Avoid time-dependent assertions
+- Don't rely on execution order
+- Clean up test data properly
+
+---
+
+## Resources
+
+- [Spring Boot Testing Documentation](https://docs.spring.io/spring-boot/docs/current/reference/html/features.html#features.testing)
+- [Spring Security Testing](https://docs.spring.io/spring-security/reference/servlet/test/index.html)
+- [JUnit 5 User Guide](https://junit.org/junit5/docs/current/user-guide/)
+- [Mockito Documentation](https://javadoc.io/doc/org.mockito/mockito-core/latest/org/mockito/Mockito.html)
+
+---
+
+Happy testing!

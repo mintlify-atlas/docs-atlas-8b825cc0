@@ -1,0 +1,473 @@
+---
+title: How it works
+description: Learn how Duit connects clients with professionals through a streamlined workflow from registration to ratings
+---
+
+Duit orchestrates the complete lifecycle of service engagements, from user registration through job completion and mutual ratings.
+
+## User registration
+
+New users create accounts by providing their basic information and selecting their role on the platform.
+
+### Account creation
+
+Users register with the following information:
+
+- **Name**: First name (2-100 characters) and last name (up to 150 characters)
+- **Email**: Used as username for authentication
+- **Password**: Securely encrypted with BCrypt
+- **DNI**: Optional Spanish national ID (format: 8 digits + letter)
+- **Phone**: Optional contact number
+- **Address**: Optional default service location
+
+```java
+@NotBlank(message = "El correo electrónico es obligatorio")
+@Email(message = "El correo electrónico debe tener un formato válido")
+@Column(name = "username", length = 100, nullable = false, unique = true)
+private String username;
+```
+
+### Role assignment
+
+During registration, users are assigned a role that determines their capabilities:
+
+<CardGroup cols={2}>
+  <Card title="USER (Client)" icon="user">
+    Can create service requests and hire professionals
+  </Card>
+  <Card title="PROFESSIONAL" icon="briefcase">
+    Can create a professional profile and apply to service requests
+  </Card>
+</CardGroup>
+
+<Note>
+  Users can later upgrade from USER to PROFESSIONAL by creating a professional profile.
+</Note>
+
+### Security measures
+
+- Passwords are hashed using BCrypt before storage
+- Spring Security manages authentication and session handling
+- User accounts can be deactivated but not deleted (for data integrity)
+
+```java
+@Column(name = "active", nullable = false)
+private Boolean active = true;
+```
+
+## Professional profile creation
+
+Users who want to offer services create a professional profile linked to their account.
+
+### Setting up a professional profile
+
+<Steps>
+  <Step title="Provide credentials">
+    Enter NIF (tax identification number) required for legal compliance
+  </Step>
+  <Step title="Write description">
+    Create a professional description (50-2000 characters) highlighting skills and experience
+  </Step>
+  <Step title="Set pricing">
+    Define hourly rate between €5.00 and €500.00
+  </Step>
+  <Step title="Select categories">
+    Choose service categories that match your expertise
+  </Step>
+</Steps>
+
+### Profile validation
+
+The platform enforces strict validation to ensure quality:
+
+```java
+@NotBlank(message = "La descripción profesional es obligatoria")
+@Size(min = 50, max = 2000)
+@Column(name = "description", columnDefinition = "TEXT", nullable = false)
+private String description;
+```
+
+<Tip>
+  A complete and detailed professional profile increases visibility and trust with potential clients.
+</Tip>
+
+### Category association
+
+Professionals can select multiple categories, stored as a many-to-many relationship:
+
+```java
+@ManyToMany(fetch = FetchType.LAZY)
+@JoinTable(
+    name = "professional_category",
+    joinColumns = @JoinColumn(name = "id_professional"),
+    inverseJoinColumns = @JoinColumn(name = "id_category")
+)
+private Set<Category> categories = new HashSet<>();
+```
+
+This enables clients to find professionals by searching specific service categories.
+
+## Service request workflow
+
+Clients follow a structured process to post service requests and receive applications.
+
+### Step 1: Creating the request
+
+Clients access the request form at `/requests/request` and provide:
+
+<Steps>
+  <Step title="Basic information">
+    Title, detailed description, and service category
+  </Step>
+  <Step title="Location">
+    Choose default address or specify custom service location
+  </Step>
+  <Step title="Timeline">
+    Optionally set a deadline for service completion
+  </Step>
+  <Step title="Publication">
+    Save as draft or publish immediately
+  </Step>
+</Steps>
+
+### Request validation
+
+The system validates all inputs before saving:
+
+```java
+@NotBlank(message = "La descripción es obligatoria")
+@Size(min = 20, max = 2000)
+@Column(name = "description", columnDefinition = "TEXT", nullable = false)
+private String description;
+```
+
+### Step 2: Publishing
+
+Requests can be saved in two states:
+
+- **DRAFT**: Visible only to the creator, can be edited freely
+- **PUBLISHED**: Visible to all professionals, accepting applications
+
+```java
+public enum Status {
+    DRAFT, PUBLISHED, IN_PROGRESS, COMPLETED, CANCELLED, EXPIRED
+}
+```
+
+<Note>
+  Only PUBLISHED requests appear in professional searches and receive applications.
+</Note>
+
+### Step 3: Receiving applications
+
+Once published, professionals can discover the request and submit applications. The client receives notifications and can view all applications at `/jobs/applications/{requestId}`.
+
+## Application process
+
+Professionals apply to service requests they're qualified and interested in completing.
+
+### Finding requests
+
+Professionals browse published service requests, filtered by:
+
+- Service category
+- Location
+- Status (only PUBLISHED requests accept applications)
+- Deadline
+
+### Submitting an application
+
+When applying, professionals provide:
+
+<CardGroup cols={2}>
+  <Card title="Proposed price" icon="dollar-sign">
+    Quote for completing the service (required)
+  </Card>
+  <Card title="Cover message" icon="message">
+    Optional message explaining qualifications (up to 1000 characters)
+  </Card>
+</CardGroup>
+
+```java
+@DecimalMin(value = "0.00", message = "El precio propuesto debe ser positivo")
+@Column(name = "proposed_price", precision = 8, scale = 2)
+private BigDecimal proposedPrice;
+```
+
+Applications are created with `PENDING` status and a timestamp:
+
+```java
+@PrePersist
+protected void onCreate() {
+    if (appliedAt == null) {
+        appliedAt = LocalDateTime.now();
+    }
+}
+```
+
+### Application review
+
+Clients review all applications on a single page, comparing:
+
+- Professional profiles and ratings
+- Proposed prices
+- Cover messages
+- Application timestamps
+
+### Accepting an application
+
+When a client accepts an application:
+
+<Steps>
+  <Step title="Application accepted">
+    Selected application status changes to ACCEPTED
+  </Step>
+  <Step title="Others rejected">
+    All other pending applications automatically change to REJECTED
+  </Step>
+  <Step title="Job created">
+    A new ServiceJob is created with the agreed price
+  </Step>
+  <Step title="Request in progress">
+    Service request status changes to IN_PROGRESS
+  </Step>
+</Steps>
+
+```java
+// From PostulacionesController.java:72
+@PostMapping("/aceptar/{postulacionId}")
+public String aceptarPostulacionEspecifica(@PathVariable Long postulacionId,
+        Authentication auth,
+        RedirectAttributes redirectAttributes) {
+    // ...
+    jobService.acceptApplication(postulacionId, usuarioLogueado);
+    // ...
+}
+```
+
+## Job lifecycle
+
+Once an application is accepted, the ServiceJob becomes the central entity for work tracking.
+
+### Job initialization
+
+A new job is created with:
+
+- **Agreed price**: From the accepted application's proposed price
+- **Status**: CREATED
+- **Start date**: Automatically set to current timestamp
+- **Linked entities**: References to both the request and accepted application
+
+```java
+@PrePersist
+protected void onCreate() {
+    if (startDate == null) {
+        startDate = LocalDateTime.now();
+    }
+}
+```
+
+### Job progression
+
+The professional manages job status through their dashboard:
+
+<Steps>
+  <Step title="Start work">
+    Change status from CREATED to IN_PROGRESS
+  </Step>
+  <Step title="Pause if needed">
+    Temporarily pause work (status: PAUSED)
+  </Step>
+  <Step title="Resume work">
+    Continue after pause (back to IN_PROGRESS)
+  </Step>
+  <Step title="Complete job">
+    Mark as COMPLETED when work is finished
+  </Step>
+</Steps>
+
+### Job management endpoints
+
+```java
+// From PostulacionesController.java
+@PostMapping("/iniciar/{jobId}")  // Start job
+@PostMapping("/pausar/{jobId}")   // Pause job
+@PostMapping("/reanudar/{jobId}") // Resume job
+@PostMapping("/finalizar/{jobId}") // Complete job
+@PostMapping("/cancelar/{jobId}") // Cancel job
+```
+
+### Job cancellation
+
+Both parties can cancel a job if needed:
+
+- Professional cancels via their applications dashboard
+- Client cancels via their requests dashboard
+
+<Note>
+  Cancelled jobs cannot be reactivated. A new application must be accepted to create a replacement job.
+</Note>
+
+## Job completion
+
+When a professional marks a job as completed, the system prepares for the rating phase.
+
+### Completion process
+
+<Steps>
+  <Step title="Professional completes">
+    Professional clicks **Finish** on the job
+  </Step>
+  <Step title="Status updated">
+    Job status changes to COMPLETED, end_date is set
+  </Step>
+  <Step title="Redirect to ratings">
+    Professional is redirected to the ratings page
+  </Step>
+  <Step title="Client notified">
+    Client sees the completed job in their dashboard
+  </Step>
+</Steps>
+
+```java
+@PostMapping("/finalizar/{jobId}")
+public String finalizarTrabajoCompletado(@PathVariable Long jobId,
+        Authentication auth,
+        RedirectAttributes redirectAttributes) {
+    // ...
+    jobService.completeJob(jobId, usuarioLogueado);
+    redirectAttributes.addFlashAttribute("success", "Trabajo finalizado. Procede a valorar.");
+    return "redirect:/shared/ratings?jobId=" + jobId;
+}
+```
+
+### ServiceJob completed state
+
+```java
+public boolean isCompleted() {
+    return status == Status.COMPLETED;
+}
+```
+
+Only completed jobs can receive ratings, preventing premature or fraudulent reviews.
+
+## Rating and reputation
+
+After job completion, both parties rate their experience, building reputation on the platform.
+
+### Creating ratings
+
+Each completed job generates two rating opportunities:
+
+<CardGroup cols={2}>
+  <Card title="Client rates professional" icon="star">
+    Type: CLIENT_TO_PROFESSIONAL
+  </Card>
+  <Card title="Professional rates client" icon="star">
+    Type: PROFESSIONAL_TO_CLIENT
+  </Card>
+</CardGroup>
+
+### Rating structure
+
+Each rating includes:
+
+```java
+@NotNull
+@Min(value = 1, message = "La puntuación mínima es 1")
+@Max(value = 5, message = "La puntuación máxima es 5")
+@Column(name = "score", nullable = false)
+private Integer score;
+
+@Size(max = 500, message = "El comentario no puede exceder los 500 caracteres")
+@Column(name = "comment", length = 500)
+private String comment;
+```
+
+### Rating lifecycle
+
+<Steps>
+  <Step title="Rating created">
+    User submits rating with score and optional comment (status: PENDING)
+  </Step>
+  <Step title="Admin review">
+    Optionally reviewed by moderators for inappropriate content
+  </Step>
+  <Step title="Published">
+    Rating becomes visible on the recipient's profile (status: PUBLISHED)
+  </Step>
+  <Step title="Hidden if needed">
+    Moderators can hide ratings that violate guidelines (status: HIDDEN)
+  </Step>
+</Steps>
+
+### Rating visibility
+
+Published ratings appear on professional profiles, helping clients make informed hiring decisions:
+
+```java
+public enum Status {
+    PENDING, PUBLISHED, HIDDEN
+}
+```
+
+### Sender and receiver identification
+
+The system tracks who sent and received each rating:
+
+```java
+public AppUser getSender() {
+    if (job == null) return null;
+    return type == Type.CLIENT_TO_PROFESSIONAL 
+        ? job.getRequest().getClient()
+        : job.getApplication().getProfessional().getUser();
+}
+
+public AppUser getReceiver() {
+    if (job == null) return null;
+    return type == Type.CLIENT_TO_PROFESSIONAL 
+        ? job.getApplication().getProfessional().getUser()
+        : job.getRequest().getClient();
+}
+```
+
+### Positive rating threshold
+
+Ratings with 4 or 5 stars are marked as positive:
+
+```java
+public boolean isPositive() {
+    return score >= 4;
+}
+```
+
+<Tip>
+  Encouraging both parties to rate honestly builds trust throughout the platform and helps maintain service quality.
+</Tip>
+
+## Complete workflow summary
+
+Here's how all the pieces connect in a typical service engagement:
+
+<Steps>
+  <Step title="Client posts request">
+    Client creates and publishes a service request with details and location
+  </Step>
+  <Step title="Professionals apply">
+    Multiple professionals submit applications with proposed prices
+  </Step>
+  <Step title="Client selects professional">
+    Client reviews applications and accepts one, creating a ServiceJob
+  </Step>
+  <Step title="Work begins">
+    Professional starts the job and updates status as work progresses
+  </Step>
+  <Step title="Job completed">
+    Professional marks job as completed when work is finished
+  </Step>
+  <Step title="Mutual ratings">
+    Both parties rate their experience, building platform reputation
+  </Step>
+</Steps>
+
+This workflow ensures transparency, accountability, and trust throughout every service engagement on Duit.

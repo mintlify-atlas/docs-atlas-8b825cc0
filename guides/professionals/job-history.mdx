@@ -1,0 +1,224 @@
+---
+title: 'Job History & Performance'
+description: 'Track your completed jobs and build your professional reputation on Duit'
+---
+
+Your job history showcases your completed work and builds your reputation on the platform through client ratings and reviews.
+
+## Viewing Job History
+
+Access your job history at `GET /professional/applications` (ProfessionalController.java:82), which displays:
+
+- **Active Jobs**: Jobs currently in progress
+- **Application History**: All your past applications and their outcomes
+- **Completed Jobs**: Jobs you've finished with ratings and reviews
+
+## Job Lifecycle
+
+Understand how jobs progress from application to completion:
+
+<Steps>
+  <Step title="Application Accepted">
+    When a client accepts your application, a `ServiceJob` is created with status `CREATED`
+  </Step>
+
+  <Step title="Job Starts">
+    The job status changes to `IN_PROGRESS` when work begins. The `startDate` is automatically set.
+  </Step>
+
+  <Step title="Job Completion">
+    When the work is finished, status changes to `COMPLETED` and the `endDate` is recorded.
+  </Step>
+
+  <Step title="Ratings Exchange">
+    Both you and the client can rate each other after job completion.
+  </Step>
+</Steps>
+
+## Job Statuses
+
+Jobs can have the following states (from ServiceJob.Status):
+
+| Status | Description | Is Active? |
+|--------|-------------|------------|
+| `CREATED` | Job accepted but not yet started | Yes |
+| `IN_PROGRESS` | Work is currently ongoing | Yes |
+| `COMPLETED` | Job finished successfully | No |
+| `CANCELLED` | Job was cancelled by either party | No |
+| `PAUSED` | Job temporarily on hold | No |
+
+<Info>
+  A job is considered "active" when its status is either `CREATED` or `IN_PROGRESS` (ServiceJob.java:81-83)
+</Info>
+
+## Job Details
+
+Each completed job contains:
+
+<ParamField path="agreedPrice" type="decimal" required>
+  The final agreed price for the job
+  - Stored with precision: 8 digits, 2 decimal places
+  - Must be a positive value (minimum: €0.00)
+</ParamField>
+
+<ParamField path="startDate" type="LocalDateTime">
+  When the job started
+  - Automatically set when job is created if not specified
+</ParamField>
+
+<ParamField path="endDate" type="LocalDateTime">
+  When the job was completed
+  - Set when status changes to `COMPLETED`
+</ParamField>
+
+<ParamField path="notes" type="string">
+  Additional notes about the job
+  - Maximum length: 2000 characters
+  - Can include work details, challenges, or special circumstances
+</ParamField>
+
+## Ratings and Reputation
+
+After completing a job, clients can rate your work. These ratings build your professional reputation.
+
+### Rating Structure
+
+Ratings follow this structure (from Rating.java):
+
+<ParamField path="type" type="enum">
+  Direction of the rating
+  - `CLIENT_TO_PROFESSIONAL`: Client rating you
+  - `PROFESSIONAL_TO_CLIENT`: You rating the client
+</ParamField>
+
+<ParamField path="score" type="integer" required>
+  Numerical rating
+  - Minimum: 1 star
+  - Maximum: 5 stars
+  - A score of 4 or 5 is considered "positive" (Rating.java:70-72)
+</ParamField>
+
+<ParamField path="comment" type="string">
+  Written feedback
+  - Maximum length: 500 characters
+  - Optional but recommended
+</ParamField>
+
+<ParamField path="status" type="enum">
+  Rating visibility
+  - `PENDING`: Not yet published
+  - `PUBLISHED`: Visible on your profile
+  - `HIDDEN`: Not displayed publicly
+</ParamField>
+
+### How Ratings Affect Your Profile
+
+Ratings impact your professional reputation:
+
+- **High Ratings (4-5 stars)**: Build trust and credibility
+- **Positive Comments**: Showcase specific strengths and skills
+- **Rating Count**: More completed jobs = more established reputation
+- **Recent Performance**: Recent ratings may be weighted more heavily
+
+<Tip>
+  Focus on delivering quality work to maintain high ratings. Positive feedback helps you stand out when clients are reviewing applications.
+</Tip>
+
+## Performance Metrics
+
+Track your professional performance through:
+
+### Completion Rate
+Percentage of accepted jobs you successfully completed vs. cancelled
+
+### Average Rating
+Your overall star rating from all client reviews
+
+### Response Time
+How quickly you typically respond to job opportunities
+
+### Job Count
+Total number of completed jobs - demonstrates experience
+
+## Understanding Job Relationships
+
+Each job connects several entities:
+
+```
+ServiceJob
+  ├─ ServiceRequest (the original client request)
+  ├─ JobApplication (your accepted application)
+  │   ├─ proposedPrice (what you originally bid)
+  │   ├─ message (your application message)
+  │   └─ appliedAt (when you applied)
+  ├─ agreedPrice (final price - may differ from proposed)
+  └─ Rating[] (reviews from this job)
+```
+
+From ServiceJob.java:89-96:
+```java
+public AppUser getClient() {
+    return request != null ? request.getClient() : null;
+}
+
+public AppUser getProfessional() {
+    return application != null && application.getProfessional() != null 
+        ? application.getProfessional().getUser() : null;
+}
+```
+
+## Accessing Job Information
+
+### Active Jobs
+View jobs you're currently working on:
+- Status is `CREATED` or `IN_PROGRESS`
+- Shows client information, agreed price, and job details
+- Track progress and remaining work
+
+### Completed Jobs
+Review your past work:
+- Status is `COMPLETED`
+- Includes start and end dates
+- Shows client ratings and feedback
+- Displays final payment amount
+
+### Cancelled Jobs
+Jobs that didn't complete:
+- Status is `CANCELLED`
+- May include notes explaining why
+- No ratings are given for cancelled jobs
+
+## Best Practices
+
+<Check>
+  **Maintain Quality**: Consistent high-quality work leads to better ratings
+</Check>
+
+<Check>
+  **Communicate Clearly**: Keep clients updated on progress
+</Check>
+
+<Check>
+  **Complete Jobs Promptly**: Timely completion builds trust
+</Check>
+
+<Check>
+  **Professional Conduct**: Treat every client interaction professionally
+</Check>
+
+<Check>
+  **Request Feedback**: Politely encourage satisfied clients to leave ratings
+</Check>
+
+## Related Information
+
+- [Creating Your Profile](/guides/professionals/creating-profile)
+- [Managing Applications](/guides/professionals/managing-applications)
+- [Understanding Service Requests](/guides/clients/creating-requests)
+
+## Entity References
+
+- **ServiceJob** entity: /home/daytona/workspace/source/src/main/java/es/duit/app/entity/ServiceJob.java
+- **Rating** entity: /home/daytona/workspace/source/src/main/java/es/duit/app/entity/Rating.java
+- **JobApplication** entity: /home/daytona/workspace/source/src/main/java/es/duit/app/entity/JobApplication.java
+- **ProfessionalController**: /home/daytona/workspace/source/src/main/java/es/duit/app/controller/ProfessionalController.java:82

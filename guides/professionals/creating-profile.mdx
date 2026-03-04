@@ -1,0 +1,103 @@
+---
+title: 'Creating Your Professional Profile'
+description: 'Learn how to create and manage your professional profile on Duit'
+---
+
+As a professional on Duit, your profile is your business card. It showcases your skills, experience, and availability to potential clients.
+
+## Profile Requirements
+
+Before you can start applying to jobs, you need to complete your professional profile with the following information:
+
+<ParamField path="description" type="string" required>
+  A detailed description of your professional experience and skills
+  - Minimum length: 50 characters
+  - Maximum length: 2000 characters
+  - Should highlight your expertise and what makes you stand out
+</ParamField>
+
+<ParamField path="hourlyRate" type="decimal" required>
+  Your hourly rate in euros
+  - Minimum: €5.00
+  - Maximum: €500.00
+  - This helps clients understand your pricing structure
+</ParamField>
+
+<ParamField path="nif" type="string" required>
+  Your Spanish Tax Identification Number (NIF)
+  - Format: 8 digits followed by 1 uppercase letter (e.g., 12345678A)
+  - Pattern validation: `^[0-9]{8}[A-Z]$`
+  - Must be unique in the system
+  - Required for legal compliance and payments
+</ParamField>
+
+<ParamField path="categories" type="array" required>
+  Professional categories that match your skills
+  - Select one or more categories
+  - Helps clients find you based on their service needs
+  - You can update these later as your skills evolve
+</ParamField>
+
+## Creating Your Profile
+
+<Steps>
+  <Step title="Access Profile Settings">
+    Navigate to `/profile/professional` to access your professional profile settings.
+  </Step>
+
+  <Step title="Fill in Your Details">
+    Complete all required fields:
+    - Write a compelling description that highlights your experience
+    - Set a competitive hourly rate based on your skills and market rates
+    - Enter your valid NIF for tax compliance
+    - Select all relevant professional categories
+  </Step>
+
+  <Step title="Verify Your Information">
+    Double-check all fields before submitting:
+    - Ensure your NIF follows the correct format (8 digits + letter)
+    - Confirm your hourly rate is within the €5-€500 range
+    - Review your description for clarity and professionalism
+  </Step>
+
+  <Step title="Submit Your Profile">
+    Submit the form via `POST /profile/professional`. If validation passes, your professional profile will be created and you can start applying to jobs.
+  </Step>
+</Steps>
+
+## Updating Your Profile
+
+You can update your professional profile at any time:
+
+1. Go to `/profile/professional`
+2. Modify any fields you want to change
+3. Submit the updated form
+
+Your changes will be validated using the same rules as profile creation.
+
+<Note>
+  Your professional profile must be complete before you can apply to any jobs. Make sure to add your address in the user profile settings as well.
+</Note>
+
+## Validation Rules
+
+The system enforces the following validation rules from the `ProfessionalProfile` entity:
+
+| Field | Constraint | Error Message |
+|-------|------------|---------------|
+| Description | @NotBlank, @Size(min=50, max=2000) | "La descripción profesional es obligatoria" / "La descripción debe tener entre 50 y 2000 caracteres" |
+| Hourly Rate | @NotNull, @DecimalMin("5.00"), @DecimalMax("500.00") | "La tarifa por hora es obligatoria" / "La tarifa por hora mínima es 5€" / "La tarifa por hora máxima es 500€" |
+| NIF | @NotBlank, @Pattern(regexp="^[0-9]{8}[A-Z]$") | "El NIF es obligatorio para profesionales" / "El NIF debe tener el formato correcto (8 dígitos + letra)" |
+
+## Related Endpoints
+
+- `GET /profile/professional` - View and edit professional profile
+- `POST /profile/professional` - Update professional profile (ProfileController.java:109)
+- `GET /professional/search` - Search for available jobs once profile is complete (ProfessionalController.java:39)
+
+## Next Steps
+
+Once your profile is complete:
+- [Start searching for jobs](/guides/professionals/managing-applications#searching-for-jobs)
+- [Learn about the application process](/guides/professionals/managing-applications)
+- [Understand how job history works](/guides/professionals/job-history)

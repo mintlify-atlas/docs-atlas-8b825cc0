@@ -1,0 +1,182 @@
+---
+title: 'Category Management'
+description: 'Learn how to create, edit, and manage service categories as an administrator'
+---
+
+Administrators can manage service categories to organize the types of services offered on the Duit platform. Categories help professionals and clients find the right services quickly.
+
+## Category Entity Structure
+
+The `Category` entity (defined in `Category.java:22`) contains the following fields:
+
+| Field | Type | Validation | Description |
+|-------|------|------------|-------------|
+| `id` | Long | Auto-generated | Unique category identifier |
+| `name` | String | Required, 2-100 chars, unique | Category name |
+| `description` | String | Optional, max 200 chars | Category description |
+| `active` | Boolean | Required, default: true | Whether category is active |
+
+### Validation Rules
+
+```java
+@NotBlank(message = "El nombre de la categoría es obligatorio")
+@Size(min = 2, max = 100, message = "El nombre debe tener entre 2 y 100 caracteres")
+private String name;
+
+@Size(max = 200, message = "La descripción no puede exceder los 200 caracteres")
+private String description;
+```
+
+## Category Management Endpoints
+
+All category management operations are handled through the `CategoryController` (CategoryController.java:17) at the `/admin` base path.
+
+<CardGroup cols={2}>
+  <Card title="View Categories" icon="list">
+    **GET** `/admin/categories`
+    
+    Displays all categories ordered by ID. Accessible from CategoryController.java:36.
+  </Card>
+  
+  <Card title="Create/Update Category" icon="floppy-disk">
+    **POST** `/admin/categories`
+    
+    Saves a new category or updates an existing one. See CategoryController.java:46.
+  </Card>
+  
+  <Card title="Edit Category" icon="pen">
+    **GET** `/admin/edit/{id}`
+    
+    Prepares a category for editing by loading its data. See CategoryController.java:80.
+  </Card>
+  
+  <Card title="Delete Category" icon="trash">
+    **GET** `/admin/delete/{id}`
+    
+    Removes a category from the system. See CategoryController.java:109.
+  </Card>
+</CardGroup>
+
+### Toggle Category Status
+
+**GET** `/admin/toggle/{id}` (CategoryController.java:132)
+
+Changes a category's active status between enabled and disabled without deleting it.
+
+```java
+public void toggleStatus(Long id) {
+    // Buscar la categoría por ID
+    Optional<Category> categoryOptional = categoryRepository.findById(id);
+    
+    // Cambiar el estado de activa/inactiva
+    Boolean estadoActual = category.getActive();
+    Boolean nuevoEstado = !Boolean.TRUE.equals(estadoActual);
+    category.setActive(nuevoEstado);
+    
+    categoryRepository.save(category);
+}
+```
+
+## CRUD Operations
+
+The `CategoryService` (CategoryService.java:22) handles all business logic for category management.
+
+### Creating a Category
+
+The service validates that no duplicate category names exist before saving:
+
+```java
+public CategoryDTO save(CategoryDTO categoryDTO) {
+    // Verificar si ya existe otra categoría con el mismo nombre
+    String nombre = categoryDTO.getName();
+    Long id = categoryDTO.getId();
+    
+    boolean nombreDuplicado = isDuplicateName(nombre, id);
+    if (nombreDuplicado) {
+        throw new IllegalArgumentException("Ya existe una categoría con ese nombre");
+    }
+    
+    // Crear nueva categoría o actualizar existente
+    Category category = new Category();
+    category.setId(categoryDTO.getId());
+    category.setName(categoryDTO.getName());
+    category.setDescription(categoryDTO.getDescription());
+    category.setActive(categoryDTO.getActive());
+    
+    Category saved = categoryRepository.save(category);
+    return new CategoryDTO(saved);
+}
+```
+
+Reference: CategoryService.java:29
+
+### Retrieving Categories
+
+Get all categories ordered by ID:
+
+```java
+public List<CategoryDTO> findAllOrdered() {
+    Sort sort = Sort.by(Sort.Direction.ASC, "id");
+    List<Category> categories = categoryRepository.findAll(sort);
+    
+    List<CategoryDTO> categoryDTOs = new ArrayList<>();
+    for (Category category : categories) {
+        categoryDTOs.add(new CategoryDTO(category));
+    }
+    
+    return categoryDTOs;
+}
+```
+
+Reference: CategoryService.java:102
+
+### Updating a Category
+
+Updating uses the same `save()` method. The service checks if the ID exists to determine whether to create or update.
+
+### Deleting a Category
+
+```java
+public void deleteById(Long id) {
+    if (id == null) {
+        throw new IllegalArgumentException("ID de categoría requerido");
+    }
+    boolean existe = categoryRepository.existsById(id);
+    if (!existe) {
+        throw new IllegalArgumentException("La categoría no existe");
+    }
+    
+    categoryRepository.deleteById(id);
+}
+```
+
+Reference: CategoryService.java:85
+
+<Note>
+Deleting a category that has associated service requests or professionals may fail due to database constraints. Consider using the toggle status feature to deactivate categories instead.
+</Note>
+
+## Best Practices
+
+<Steps>
+  <Step title="Use Descriptive Names">
+    Choose clear, concise category names that professionals and clients will easily understand (e.g., "Plumbing", "Electrical", "Cleaning").
+  </Step>
+  
+  <Step title="Add Helpful Descriptions">
+    Provide a brief description (up to 200 characters) to clarify what services belong in each category.
+  </Step>
+  
+  <Step title="Deactivate Instead of Delete">
+    Use the toggle status feature to deactivate categories rather than deleting them to preserve historical data.
+  </Step>
+  
+  <Step title="Monitor Category Usage">
+    Regularly review which categories are being used by professionals and clients to optimize your category structure.
+  </Step>
+</Steps>
+
+## Related Resources
+
+- [User Oversight](/guides/admin/user-oversight) - Managing users and their roles
+- [Admin Dashboard](/guides/admin/dashboard) - Overview of admin dashboard features

@@ -1,0 +1,417 @@
+---
+title: Rating Professionals
+description: Learn how to rate and review professionals after job completion on Duit
+---
+
+## Overview
+
+After a job is completed, you can rate the professional's work and leave a review. Ratings help other clients make informed decisions and encourage high-quality service from professionals.
+
+## The Rating Entity
+
+Ratings are stored using the `Rating` entity:
+
+```java Rating.java:18-87
+@Entity
+@Table(name = "rating")
+public class Rating extends BaseEntity {
+
+    public enum Type {
+        CLIENT_TO_PROFESSIONAL, PROFESSIONAL_TO_CLIENT
+    }
+
+    public enum Status {
+        PENDING, PUBLISHED, HIDDEN
+    }
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id_rating")
+    private Long id;
+
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "id_job", nullable = false)
+    private ServiceJob job;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type", length = 30, nullable = false)
+    private Type type;
+
+    @NotNull
+    @Min(value = 1, message = "La puntuación mínima es 1")
+    @Max(value = 5, message = "La puntuación máxima es 5")
+    @Column(name = "score", nullable = false)
+    private Integer score;
+
+    @Size(max = 500, message = "El comentario no puede exceder los 500 caracteres")
+    @Column(name = "comment", length = 500)
+    private String comment;
+
+    @Column(name = "rated_at")
+    private LocalDateTime ratedAt;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private Status status = Status.PENDING;
+
+    public boolean isPositive() {
+        return score >= 4;
+    }
+
+    public AppUser getSender() {
+        if (job == null)
+            return null;
+        return type == Type.CLIENT_TO_PROFESSIONAL ? job.getRequest().getClient()
+                : job.getApplication().getProfessional().getUser();
+    }
+
+    public AppUser getReceiver() {
+        if (job == null)
+            return null;
+        return type == Type.CLIENT_TO_PROFESSIONAL ? job.getApplication().getProfessional().getUser()
+                : job.getRequest().getClient();
+    }
+}
+```
+
+## Rating Types
+
+Duit supports bidirectional ratings:
+
+- **CLIENT_TO_PROFESSIONAL**: You rate the professional's work (most common)
+- **PROFESSIONAL_TO_CLIENT**: Professional rates their experience working with you
+
+As a client, you'll primarily create `CLIENT_TO_PROFESSIONAL` ratings.
+
+## When to Rate
+
+You can rate a professional after:
+
+1. **Job completion**: When you mark a job as `COMPLETED`, you're redirected to the rating page
+2. **Manual access**: Visit `/shared/ratings` to rate completed jobs
+
+Ratings are only available for jobs with status `COMPLETED`.
+
+## Creating a Rating
+
+<Steps>
+  <Step title="Complete the job">
+    First, mark the job as complete. You'll be automatically redirected to the rating page.
+    
+    ```java MyRequestsController.java:190-206
+    @PostMapping("/complete/{jobId}")
+    public String completeJob(@PathVariable Long jobId, Authentication auth) {
+        AppUser usuarioLogueado = authService.getAuthenticatedUser(auth);
+        ServiceJob trabajoEncontrado = buscarYValidarTrabajo(jobId, usuarioLogueado);
+        
+        if (trabajoEncontrado == null) {
+            return "redirect:/requests/my-requests";
+        }
+        
+        completarTrabajoEspecifico(trabajoEncontrado);
+        
+        // Redirect to ratings page
+        return "redirect:/shared/ratings?jobId=" + jobId;
+    }
+    ```
+  </Step>
+  
+  <Step title="Select a score">
+    Choose a rating from 1 to 5 stars:
+    - **5 stars**: Excellent, exceeded expectations
+    - **4 stars**: Good, met expectations
+    - **3 stars**: Satisfactory, some issues
+    - **2 stars**: Poor, multiple issues
+    - **1 star**: Very poor, unacceptable
+  </Step>
+  
+  <Step title="Write a review (optional)">
+    Add comments about your experience (up to 500 characters). Be specific and constructive.
+  </Step>
+  
+  <Step title="Submit the rating">
+    Submit your rating to save it to the system.
+  </Step>
+</Steps>
+
+## Rating Submission
+
+The rating form is submitted to `/ratings/crear`:
+
+```java RatingsController.java:33-73
+@PostMapping("/crear")
+public String crearNuevaValoracion(@Valid @ModelAttribute RatingDTO ratingForm,
+        BindingResult bindingResult,
+        Authentication auth,
+        RedirectAttributes redirectAttributes) {
+
+    try {
+        if (bindingResult.hasErrors()) {
+            String mensajeError = bindingResult.getAllErrors().get(0).getDefaultMessage();
+            redirectAttributes.addFlashAttribute("error", mensajeError);
+            return "redirect:/shared/ratings";
+        }
+
+        // Get currently logged in user
+        AppUser usuarioLogueado = authService.getAuthenticatedUser(auth);
+
+        // Normalize comment if exists
+        String comentarioNormalizado = (ratingForm.getComment() == null || ratingForm.getComment().trim().isEmpty())
+                ? null
+                : ratingForm.getComment().trim();
+
+        // Create rating using service
+        ratingService.createRating(ratingForm.getJobId(), ratingForm.getScore(), comentarioNormalizado,
+                usuarioLogueado);
+
+        // Prepare success message and redirect
+        String mensajeExito = "Valoración registrada correctamente.";
+        redirectAttributes.addFlashAttribute("success", mensajeExito);
+        return "redirect:/shared/ratings";
+
+    } catch (IllegalArgumentException error) {
+        // Handle validation errors
+        redirectAttributes.addFlashAttribute("error", error.getMessage());
+        return "redirect:/shared/ratings";
+    } catch (Exception error) {
+        // Handle unexpected errors
+        String mensajeErrorGenerico = "Error inesperado al crear la valoración. Inténtalo de nuevo.";
+        redirectAttributes.addFlashAttribute("error", mensajeErrorGenerico);
+        return "redirect:/shared/ratings";
+    }
+}
+```
+
+## Rating DTO
+
+The rating form uses `RatingDTO` with validation:
+
+```java RatingDTO.java:9-21
+@Data
+public class RatingDTO {
+    @NotNull(message = "El trabajo es requerido")
+    private Long jobId;
+
+    @NotNull(message = "La puntuacion es requerida")
+    @Min(value = 1, message = "La puntuacion debe estar entre 1 y 5")
+    @Max(value = 5, message = "La puntuacion debe estar entre 1 y 5")
+    private Integer score;
+
+    @Size(max = 1000, message = "El comentario no puede superar los 1000 caracteres")
+    private String comment;
+}
+```
+
+### Required Fields
+
+<ParamField path="jobId" type="Long" required>
+  The ID of the completed job you're rating
+</ParamField>
+
+<ParamField path="score" type="Integer" required>
+  Rating score from 1 to 5 stars
+  
+  **Validation:**
+  - Minimum: 1
+  - Maximum: 5
+  - Cannot be null
+</ParamField>
+
+### Optional Fields
+
+<ParamField path="comment" type="String">
+  Written review of the professional's work
+  
+  **Validation:**
+  - Maximum length: 500 characters (in entity) / 1000 characters (in DTO)
+  - Can be null or empty
+  - Automatically trimmed of whitespace
+</ParamField>
+
+## Rating Status
+
+Ratings go through approval workflow:
+
+```java Rating.java:24-26
+public enum Status {
+    PENDING, PUBLISHED, HIDDEN
+}
+```
+
+- **PENDING**: Newly created, awaiting moderation
+- **PUBLISHED**: Approved and visible to other users
+- **HIDDEN**: Hidden by administrators (policy violation, spam, etc.)
+
+All ratings start as `PENDING` when you submit them.
+
+## Rating Constraints
+
+### Score Validation
+
+- Must be between 1 and 5 (inclusive)
+- Required field
+- Integer value only
+
+```java Rating.java:46-49
+@NotNull
+@Min(value = 1, message = "La puntuación mínima es 1")
+@Max(value = 5, message = "La puntuación máxima es 5")
+private Integer score;
+```
+
+### Comment Validation
+
+- Maximum 500 characters in the database
+- Optional (can be null)
+- Automatically trimmed of whitespace
+- Empty strings converted to null
+
+```java Rating.java:51-53
+@Size(max = 500, message = "El comentario no puede exceder los 500 caracteres")
+@Column(name = "comment", length = 500)
+private String comment;
+```
+
+## Viewing Ratings
+
+Ratings affect professional profiles:
+
+- **Average rating**: Calculated from all published ratings
+- **Rating count**: Total number of ratings received
+- **Individual reviews**: Visible on professional profile pages
+
+As a client, checking ratings helps you:
+- Choose reliable professionals
+- Set appropriate expectations
+- Understand professional strengths
+
+## Rating Helper Methods
+
+### Positive Rating Check
+
+Determine if a rating is positive (4+ stars):
+
+```java Rating.java:70-72
+public boolean isPositive() {
+    return score >= 4;
+}
+```
+
+### Getting Rating Participants
+
+Identify who sent and received the rating:
+
+```java Rating.java:74-87
+public AppUser getSender() {
+    if (job == null)
+        return null;
+    return type == Type.CLIENT_TO_PROFESSIONAL ? job.getRequest().getClient()
+            : job.getApplication().getProfessional().getUser();
+}
+
+public AppUser getReceiver() {
+    if (job == null)
+        return null;
+    return type == Type.CLIENT_TO_PROFESSIONAL ? job.getApplication().getProfessional().getUser()
+            : job.getRequest().getClient();
+}
+```
+
+## Best Practices
+
+<Tip>
+**Rate promptly after completion**
+
+Submit your rating while the experience is fresh in your mind. This provides the most accurate and helpful feedback.
+</Tip>
+
+<Tip>
+**Be specific in comments**
+
+Instead of "Good work," write "Arrived on time, completed repairs quickly, cleaned up work area thoroughly."
+</Tip>
+
+<Tip>
+**Be fair and constructive**
+
+If issues occurred, describe them objectively. If the professional resolved problems, mention that too.
+</Tip>
+
+<Tip>
+**Focus on professionalism**
+
+Comment on:
+- Work quality
+- Timeliness
+- Communication
+- Cleanliness
+- Problem-solving
+</Tip>
+
+## Rating Guidelines
+
+### What to Include
+
+- Quality of work completed
+- Professional's punctuality and reliability
+- Communication and responsiveness
+- Problem-solving abilities
+- Overall experience
+
+### What to Avoid
+
+- Personal attacks or insults
+- Irrelevant information
+- Discriminatory comments
+- Information about pricing disputes
+- Contact information or external links
+
+<Warning>
+Ratings that violate community guidelines may be hidden by administrators and could affect your account standing.
+</Warning>
+
+## Rating Impact
+
+Your ratings help:
+
+1. **Other clients**: Make informed decisions when selecting professionals
+2. **Professionals**: Understand their strengths and areas for improvement
+3. **Platform**: Maintain quality standards and trust
+4. **You**: Build a reputation as a fair, reliable client
+
+## Common Questions
+
+### Can I edit a rating after submission?
+
+Ratings are typically final once submitted. Contact support if you need to modify a rating for a valid reason.
+
+### Can I rate a cancelled job?
+
+No, only jobs with status `COMPLETED` can be rated.
+
+### Can a professional see who rated them?
+
+Yes, ratings are associated with specific jobs, so professionals can see which client left each rating.
+
+### What if I have a serious complaint?
+
+For serious issues (safety, misconduct, fraud), contact platform administrators directly rather than only leaving a rating.
+
+## Rating Workflow
+
+```
+Job COMPLETED → Create Rating (PENDING)
+              → Admin Review
+              → Rating PUBLISHED (visible to all)
+              → Affects Professional's Average Rating
+```
+
+## Related
+
+- [Managing Jobs](/guides/clients/managing-jobs)
+- [Finding Professionals](/guides/clients/finding-professionals)
+- [Rating Entity](/architecture/entities#rating)
+- [ServiceJob Entity](/architecture/entities#servicejob)

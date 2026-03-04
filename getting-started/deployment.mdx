@@ -1,0 +1,355 @@
+---
+title: Deployment
+description: Deploy Duit locally and to production environments
+---
+
+## Local Deployment
+
+After completing [Installation](/getting-started/installation) and [Configuration](/getting-started/configuration), you're ready to run Duit locally.
+
+### Running the Application
+
+<Steps>
+  <Step title="Start the application">
+    Use the Maven wrapper to run Duit:
+
+    <CodeGroup>
+    ```bash Linux/Mac
+    ./mvnw spring-boot:run
+    ```
+
+    ```bash Windows
+    mvnw.cmd spring-boot:run
+    ```
+    </CodeGroup>
+
+    The application will start and you should see output similar to:
+
+    ```
+    Starting DuitApplication using Java 21
+    ...
+    Started DuitApplication in 4.523 seconds
+    ```
+  </Step>
+
+  <Step title="Access the application">
+    Open your web browser and navigate to:
+
+    ```
+    http://localhost:8080
+    ```
+
+    You should see the Duit home page.
+  </Step>
+
+  <Step title="Verify database connection">
+    Check the application logs for successful database connection:
+
+    ```
+    HikariPool-1 - Starting...
+    HikariPool-1 - Start completed.
+    ```
+
+    The database schema will be automatically created or updated based on your JPA entities.
+  </Step>
+</Steps>
+
+### Building for Production
+
+To create a production-ready JAR file:
+
+<CodeGroup>
+```bash Linux/Mac
+./mvnw clean package -DskipTests
+```
+
+```bash Windows
+mvnw.cmd clean package -DskipTests
+```
+</CodeGroup>
+
+The JAR file will be created in `target/duit-0.0.1-SNAPSHOT.jar`.
+
+<Info>
+  The `-DskipTests` flag skips running tests during build. Remove it to run tests before packaging.
+</Info>
+
+### Running the JAR
+
+Once built, run the JAR file directly:
+
+<CodeGroup>
+```bash Linux/Mac
+java -jar target/duit-0.0.1-SNAPSHOT.jar
+```
+
+```bash Windows
+java -jar target\duit-0.0.1-SNAPSHOT.jar
+```
+</CodeGroup>
+
+## Production Deployment
+
+Duit can be deployed to various cloud platforms. The current production deployment uses Koyeb with a Neon PostgreSQL database.
+
+### Environment Setup
+
+<Warning>
+  Before deploying to production, review and update these critical settings in `application.properties`:
+</Warning>
+
+```properties Production Checklist
+# Disable SQL logging
+spring.jpa.show-sql=false
+
+# Enable template caching
+spring.thymeleaf.cache=true
+
+# Use validate instead of update for schema
+spring.jpa.hibernate.ddl-auto=validate
+
+# Security: Hide error details
+server.error.include-message=never
+server.error.include-binding-errors=never
+server.error.include-stacktrace=never
+```
+
+### Deployment on Koyeb (Current Setup)
+
+Duit is currently deployed on [Koyeb](https://www.koyeb.com/) at: https://duitapp.koyeb.app/
+
+<Steps>
+  <Step title="Prepare your repository">
+    Ensure your code is pushed to a Git repository (GitHub, GitLab, etc.).
+  </Step>
+
+  <Step title="Create a Koyeb account">
+    Sign up at [koyeb.com](https://www.koyeb.com/) if you haven't already.
+  </Step>
+
+  <Step title="Deploy from Git">
+    1. Click "Create App" in Koyeb dashboard
+    2. Select "GitHub" as the deployment source
+    3. Choose your Duit repository
+    4. Configure build settings:
+       - **Build command**: `./mvnw clean package -DskipTests`
+       - **Run command**: `java -jar target/duit-0.0.1-SNAPSHOT.jar`
+  </Step>
+
+  <Step title="Configure environment variables">
+    Add your production environment variables in Koyeb:
+
+    ```
+    DB_URL=jdbc:postgresql://your-neon-host.neon.tech:5432/duit?sslmode=require
+    DB_USER=your_production_user
+    DB_PASS=your_production_password
+    ```
+  </Step>
+
+  <Step title="Deploy">
+    Click "Deploy" and wait for the build to complete. Koyeb will provide a public URL for your application.
+  </Step>
+</Steps>
+
+### PostgreSQL Database (Neon)
+
+Duit uses [Neon](https://neon.tech/) for production PostgreSQL hosting.
+
+<Steps>
+  <Step title="Create a Neon project">
+    1. Sign up at [neon.tech](https://neon.tech/)
+    2. Create a new project
+    3. Select your preferred region (e.g., `us-east-2`)
+  </Step>
+
+  <Step title="Get connection details">
+    Neon will provide connection details in this format:
+
+    ```
+    Host: ep-example-123456.us-east-2.aws.neon.tech
+    Database: duit
+    User: your_user
+    Password: your_password
+    Port: 5432
+    ```
+  </Step>
+
+  <Step title="Configure HikariCP for Neon">
+    The HikariCP settings in `application.properties` are already optimized for Neon:
+
+    ```properties
+    spring.datasource.hikari.maximum-pool-size=20
+    spring.datasource.hikari.minimum-idle=5
+    spring.datasource.hikari.idle-timeout=300000
+    spring.datasource.hikari.max-lifetime=600000
+    ```
+
+    <Info>
+      These settings prevent connection pooling issues common with serverless databases.
+    </Info>
+  </Step>
+</Steps>
+
+### Alternative Deployment Options
+
+<CardGroup cols={2}>
+  <Card title="Heroku" icon="cloud">
+    Deploy using Heroku's Java buildpack with Heroku Postgres add-on.
+  </Card>
+  <Card title="Railway" icon="train">
+    Connect your GitHub repo and Railway will auto-deploy with built-in PostgreSQL.
+  </Card>
+  <Card title="AWS Elastic Beanstalk" icon="aws">
+    Upload JAR file or deploy via CodePipeline with RDS PostgreSQL.
+  </Card>
+  <Card title="Docker" icon="docker">
+    Containerize your application for deployment on any platform.
+  </Card>
+</CardGroup>
+
+### Docker Deployment (Optional)
+
+Create a `Dockerfile` in your project root:
+
+```dockerfile Dockerfile
+FROM eclipse-temurin:21-jre-alpine
+
+WORKDIR /app
+
+# Copy the JAR file
+COPY target/duit-0.0.1-SNAPSHOT.jar app.jar
+
+# Expose port
+EXPOSE 8080
+
+# Run the application
+ENTRYPOINT ["java", "-jar", "app.jar"]
+```
+
+Build and run with Docker:
+
+```bash
+# Build the JAR
+./mvnw clean package -DskipTests
+
+# Build Docker image
+docker build -t duit:latest .
+
+# Run container
+docker run -p 8080:8080 \
+  -e DB_URL="jdbc:postgresql://host.docker.internal:5432/duit" \
+  -e DB_USER="your_user" \
+  -e DB_PASS="your_password" \
+  duit:latest
+```
+
+<Warning>
+  When using Docker on Mac/Windows, use `host.docker.internal` instead of `localhost` to connect to the host machine's PostgreSQL.
+</Warning>
+
+## Health Monitoring
+
+Duit includes Spring Boot Actuator for health monitoring.
+
+### Actuator Endpoints
+
+Access health information at:
+
+```
+http://localhost:8080/actuator/health
+```
+
+Response:
+
+```json
+{
+  "status": "UP",
+  "groups": ["liveness", "readiness"]
+}
+```
+
+<Info>
+  Configure additional actuator endpoints in `application.properties` if needed. See [Spring Boot Actuator documentation](https://docs.spring.io/spring-boot/docs/current/reference/html/actuator.html).
+</Info>
+
+## Production Considerations
+
+### Security
+
+- **HTTPS**: Always use HTTPS in production. Configure SSL certificates through your hosting provider.
+- **Secrets Management**: Use environment variables or secret management services (AWS Secrets Manager, Vault, etc.).
+- **Database Backups**: Enable automated backups on your PostgreSQL provider.
+- **Rate Limiting**: Consider adding rate limiting for API endpoints.
+
+### Performance
+
+- **Connection Pooling**: HikariCP is already configured with optimal settings.
+- **Caching**: Enable Thymeleaf caching in production (`spring.thymeleaf.cache=true`).
+- **Logging**: Reduce log levels in production to minimize I/O.
+- **CDN**: Serve static assets through a CDN for better performance.
+
+### Monitoring
+
+- **Application Logs**: Configure centralized logging (ELK stack, Splunk, Datadog).
+- **Database Monitoring**: Monitor query performance and connection pool metrics.
+- **Uptime Monitoring**: Use services like Pingdom, UptimeRobot, or StatusCake.
+- **Error Tracking**: Integrate error tracking tools like Sentry or Rollbar.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Application fails to start">
+    **Check**:
+    - Database connection is accessible
+    - Environment variables are properly set
+    - Port 8080 is not in use
+    - Java 21 is being used
+
+    **View logs**:
+    ```bash
+    # Local
+    ./mvnw spring-boot:run
+
+    # JAR
+    java -jar target/duit-0.0.1-SNAPSHOT.jar
+    ```
+  </Accordion>
+
+  <Accordion title="Database connection errors in production">
+    **Common issues**:
+    - Missing `?sslmode=require` in connection string for cloud databases
+    - Firewall/security group blocking connections
+    - Incorrect credentials in environment variables
+    - Database instance is paused (Neon auto-pauses after inactivity)
+
+    **Solution**: Verify connection string and credentials, check database status.
+  </Accordion>
+
+  <Accordion title="OutOfMemoryError">
+    **Solution**: Increase JVM heap size:
+
+    ```bash
+    java -Xmx512m -Xms256m -jar target/duit-0.0.1-SNAPSHOT.jar
+    ```
+
+    Or configure in your deployment platform's settings.
+  </Accordion>
+
+  <Accordion title="Slow performance">
+    **Check**:
+    - Enable Thymeleaf caching: `spring.thymeleaf.cache=true`
+    - Review database query performance
+    - Verify HikariCP pool settings are appropriate
+    - Check if database connection limit is reached
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+With your application deployed, explore:
+
+- [Features](/features) - Learn about Duit's functionality
+- [Architecture](/architecture/overview) - Understand the technical design
+- [Development Reference](/development/api-endpoints) - Explore API endpoints and controllers
+
+For support and issues, visit the [GitHub repository](https://github.com/your-repo/duit).

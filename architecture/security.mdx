@@ -1,0 +1,433 @@
+---
+title: 'Security Architecture'
+description: 'Spring Security configuration, authentication, authorization, and security best practices'
+icon: 'shield-halved'
+---
+
+## Overview
+
+Duit uses Spring Security 6.x (included with Spring Boot 3.5) to provide comprehensive authentication and authorization. The security architecture follows industry best practices for password hashing, session management, and role-based access control.
+
+## Security Configuration
+
+### SecurityConfig Class
+
+**Package**: `es.duit.app.config.SecurityConfig`
+
+The main security configuration class defines:
+- HTTP security filter chain
+- Password encoder
+- Authentication and authorization rules
+
+```java
+@Configuration
+public class SecurityConfig {
+    private final CustomUserDetailsService customUserDetailsService;
+    private final LoginSuccessHandler loginSuccessHandler;
+    private final LoginFailureHandler loginFailureHandler;
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        // Configuration details below
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+}
+```
+
+**Location**: `~/workspace/source/src/main/java/es/duit/app/config/SecurityConfig.java:1`
+
+## Authentication
+
+### Password Encoding
+
+All passwords are hashed using BCrypt:
+
+```java
+@Bean
+public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
+}
+```
+
+**BCrypt Benefits**:
+- Adaptive hashing (configurable work factor)
+- Built-in salt generation
+- Resistant to rainbow table attacks
+- Industry standard for password storage
+
+### UserDetailsService
+
+Custom implementation loads user details from the database:
+
+**Class**: `CustomUserDetailsService`  
+**Package**: `es.duit.app.security`
+
+This service:
+1. Loads user by username (email)
+2. Converts AppUser to Spring Security UserDetails
+3. Loads user authorities (roles)
+
+### Form-Based Login
+
+Configuration for the login form:
+
+```java
+.formLogin(form -> form
+    .loginPage("/login")
+    .loginProcessingUrl("/login")
+    .usernameParameter("username")
+    .passwordParameter("password")
+    .successHandler(loginSuccessHandler)
+    .failureHandler(loginFailureHandler)
+    .permitAll())
+```
+
+**Login Flow**:
+1. User submits credentials to `/login`
+2. Spring Security validates credentials
+3. On success → `LoginSuccessHandler`
+4. On failure → `LoginFailureHandler`
+
+### Login Success Handler
+
+**Class**: `LoginSuccessHandler`  
+**Package**: `es.duit.app.config`  
+**Location**: `~/workspace/source/src/main/java/es/duit/app/config/LoginSuccessHandler.java:1`
+
+Handles successful authentication:
+
+```java
+@Component
+public class LoginSuccessHandler extends SavedRequestAwareAuthenticationSuccessHandler {
+    private final AccessLogService accessLogService;
+
+    public LoginSuccessHandler(AccessLogService accessLogService) {
+        this.accessLogService = accessLogService;
+        setDefaultTargetUrl("/home");
+        setAlwaysUseDefaultTargetUrl(true);
+    }
+
+    @Override
+    public void onAuthenticationSuccess(
+            HttpServletRequest peticion,
+            HttpServletResponse respuesta,
+            Authentication usuarioAutenticado) throws ServletException, IOException {
+        
+        String emailDelUsuario = usuarioAutenticado.getName();
+        accessLogService.saveSuccessfulLogin(emailDelUsuario, peticion);
+        super.onAuthenticationSuccess(peticion, respuesta, usuarioAutenticado);
+    }
+}
+```
+
+**Actions on successful login**:
+1. Extract authenticated username (email)
+2. Log successful login to `access_log` table
+3. Redirect to `/home`
+
+### Login Failure Handler
+
+**Class**: `LoginFailureHandler`  
+**Package**: `es.duit.app.config`  
+**Location**: `~/workspace/source/src/main/java/es/duit/app/config/LoginFailureHandler.java:1`
+
+Handles failed authentication:
+
+```java
+@Component
+public class LoginFailureHandler extends SimpleUrlAuthenticationFailureHandler {
+    private final AccessLogService accessLogService;
+
+    public LoginFailureHandler(AccessLogService accessLogService) {
+        this.accessLogService = accessLogService;
+        setDefaultFailureUrl("/login?error=true");
+    }
+
+    @Override
+    public void onAuthenticationFailure(
+            HttpServletRequest peticion,
+            HttpServletResponse respuesta,
+            AuthenticationException excepcion) throws IOException, ServletException {
+        
+        String emailIntentado = peticion.getParameter("username");
+        boolean emailEsValido = (emailIntentado != null && !emailIntentado.trim().isEmpty());
+        
+        if (emailEsValido) {
+            accessLogService.saveFailedLogin(emailIntentado, peticion);
+        }
+        
+        super.onAuthenticationFailure(peticion, respuesta, excepcion);
+    }
+}
+```
+
+**Actions on failed login**:
+1. Extract attempted username from request
+2. Log failed login attempt to `access_log` table (if username provided)
+3. Redirect to `/login?error=true`
+
+## Authorization
+
+### URL-Based Access Control
+
+The security filter chain defines access rules for different URL patterns:
+
+```java
+.authorizeHttpRequests(auth -> auth
+    .requestMatchers(
+        "/", "/index", "/public/**", "/login", "/signup",
+        "/register", "/error", "/error/**",
+        "/css/**", "/js/**", "/img/**", "/static/**",
+        "/privacy", "/terms", "/help")
+    .permitAll()
+    .requestMatchers("/admin/**").hasRole("ADMIN")
+    .requestMatchers("/user/**").hasAnyRole("USER", "ADMIN")
+    .requestMatchers("/professional/**").hasAnyRole("PROFESSIONAL", "ADMIN")
+    .anyRequest().authenticated())
+```
+
+### Access Rules
+
+| URL Pattern | Access Level | Roles |
+|------------|--------------|-------|
+| `/`, `/index` | Public | None required |
+| `/public/**` | Public | None required |
+| `/login`, `/signup`, `/register` | Public | None required |
+| `/css/**`, `/js/**`, `/img/**`, `/static/**` | Public | None required (static resources) |
+| `/privacy`, `/terms`, `/help` | Public | None required |
+| `/error`, `/error/**` | Public | None required |
+| `/admin/**` | Admin only | ROLE_ADMIN |
+| `/user/**` | Users and admins | ROLE_USER, ROLE_ADMIN |
+| `/professional/**` | Professionals and admins | ROLE_PROFESSIONAL, ROLE_ADMIN |
+| All other URLs | Authenticated | Any authenticated user |
+
+<Note>
+Spring Security automatically adds "ROLE_" prefix to role names. When using `hasRole("ADMIN")`, it checks for "ROLE_ADMIN" in the database.
+</Note>
+
+### Role Hierarchy
+
+The application defines four user roles:
+
+1. **ADMIN** - Full system access
+2. **USER** - Regular client users
+3. **PROFESSIONAL** - Service providers
+4. **MODERATOR** - Content moderation (if implemented)
+
+**Database Representation**:
+- Stored in `user_role` table
+- Referenced by `app_user.id_role` foreign key
+- See `UserRole.RoleName` enum at `~/workspace/source/src/main/java/es/duit/app/entity/UserRole.java:22`
+
+## Session Management
+
+### Remember Me
+
+Persistent login functionality:
+
+```java
+.rememberMe(remember -> remember
+    .key("duit-remember-me")
+    .rememberMeParameter("remember-me")
+    .tokenValiditySeconds(86400)
+    .userDetailsService(customUserDetailsService))
+```
+
+**Configuration**:
+- Cookie name parameter: `remember-me`
+- Token validity: 86400 seconds (24 hours)
+- Uses custom UserDetailsService
+- Secret key: `duit-remember-me`
+
+### Logout
+
+Logout configuration:
+
+```java
+.logout(logout -> logout
+    .logoutSuccessUrl("/login?logout=true")
+    .invalidateHttpSession(true)
+    .deleteCookies("JSESSIONID", "remember-me")
+    .permitAll())
+```
+
+**Logout Actions**:
+1. Invalidate HTTP session
+2. Delete `JSESSIONID` cookie
+3. Delete `remember-me` cookie
+4. Redirect to `/login?logout=true`
+
+## Exception Handling
+
+### Access Denied
+
+```java
+.exceptionHandling(ex -> ex
+    .accessDeniedPage("/error/403"))
+```
+
+When a user tries to access a protected resource without proper authorization, they are redirected to `/error/403`.
+
+## CSRF Protection
+
+<Warning>
+CSRF protection is currently **DISABLED** in the configuration:
+
+```java
+.csrf(csrf -> csrf.disable())
+```
+
+This should be **enabled in production** for security. Only disable for development/testing or when using stateless REST APIs with token-based authentication.
+</Warning>
+
+### Enabling CSRF (Recommended for Production)
+
+To enable CSRF protection, remove or modify the CSRF configuration:
+
+```java
+// Enable with default settings
+.csrf(Customizer.withDefaults())
+
+// Or configure specific settings
+.csrf(csrf -> csrf
+    .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()))
+```
+
+Then include CSRF token in Thymeleaf forms:
+
+```html
+<form th:action="@{/login}" method="post">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+    <!-- form fields -->
+</form>
+```
+
+## Access Logging
+
+All login attempts (successful and failed) are logged to the `access_log` table via the `AccessLogService`.
+
+**Logged Information**:
+- User ID/email
+- Timestamp
+- Source IP address
+- Success/failure status
+
+**Use Cases**:
+- Security monitoring
+- Audit trail
+- Detecting brute force attacks
+- User activity tracking
+
+See entity definition at `~/workspace/source/src/main/java/es/duit/app/entity/AccessLog.java:1`
+
+## View-Level Security
+
+Thymeleaf templates can use Spring Security expressions:
+
+```html
+<!-- Show only to authenticated users -->
+<div sec:authorize="isAuthenticated()">
+    Welcome, <span sec:authentication="name">User</span>!
+</div>
+
+<!-- Show only to admins -->
+<div sec:authorize="hasRole('ADMIN')">
+    <a href="/admin">Admin Panel</a>
+</div>
+
+<!-- Show only to professionals -->
+<div sec:authorize="hasRole('PROFESSIONAL')">
+    <a href="/professional/dashboard">My Dashboard</a>
+</div>
+```
+
+**Available via**: `thymeleaf-extras-springsecurity6` dependency
+
+## Security Best Practices
+
+### Implemented
+
+- ✅ BCrypt password hashing with salt
+- ✅ Role-based access control (RBAC)
+- ✅ Session invalidation on logout
+- ✅ Remember-me with expiration
+- ✅ Access logging for audit trail
+- ✅ Custom success/failure handlers
+- ✅ Separate roles for different user types
+
+### Recommended for Production
+
+- ⚠️ **Enable CSRF protection**
+- ⚠️ Use HTTPS only (secure cookies)
+- ⚠️ Implement rate limiting on login endpoint
+- ⚠️ Add password complexity requirements
+- ⚠️ Implement account lockout after failed attempts
+- ⚠️ Add CAPTCHA for login form
+- ⚠️ Secure actuator endpoints
+- ⚠️ Configure Content Security Policy (CSP) headers
+- ⚠️ Enable HTTP Strict Transport Security (HSTS)
+
+### Password Policy
+
+Current validation in AppUser entity:
+
+```java
+@NotBlank(message = "La contraseña es obligatoria")
+@Size(min = 60, max = 255, message = "La contraseña encriptada debe tener la longitud correcta")
+private String password;
+```
+
+<Note>
+This validates the **hashed** password length (BCrypt produces 60 characters). Add a separate validator for **raw** password complexity before hashing (e.g., min 8 characters, uppercase, lowercase, number, special character).
+</Note>
+
+## Method-Level Security
+
+To enable method-level security annotations, add `@EnableMethodSecurity` to `SecurityConfig`:
+
+```java
+@Configuration
+@EnableMethodSecurity
+public class SecurityConfig {
+    // ...
+}
+```
+
+Then use annotations on service methods:
+
+```java
+@PreAuthorize("hasRole('ADMIN')")
+public void deleteUser(Long userId) {
+    // Only admins can call this
+}
+
+@PreAuthorize("#userId == authentication.principal.id or hasRole('ADMIN')")
+public void updateUser(Long userId, UserDto dto) {
+    // Users can update their own profile, admins can update anyone
+}
+```
+
+## Security Headers
+
+Consider adding security headers in production:
+
+```java
+.headers(headers -> headers
+    .contentSecurityPolicy(csp -> csp
+        .policyDirectives("default-src 'self'"))
+    .frameOptions(frame -> frame.deny())
+    .xssProtection(xss -> xss.enable())
+    .httpStrictTransportSecurity(hsts -> hsts
+        .includeSubDomains(true)
+        .maxAgeInSeconds(31536000)))
+```
+
+This protects against:
+- Clickjacking (X-Frame-Options)
+- XSS attacks (X-XSS-Protection)
+- Man-in-the-middle attacks (HSTS)
+- Unauthorized resource loading (CSP)

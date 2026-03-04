@@ -1,0 +1,257 @@
+---
+title: Configuration
+description: Configure Duit for your environment
+---
+
+## Overview
+
+Duit uses environment variables for sensitive configuration and `application.properties` for application settings. This approach keeps credentials secure and allows easy configuration across different environments.
+
+## Environment Variables
+
+<Steps>
+  <Step title="Create .env file">
+    Create a `.env` file in the root directory of your project:
+
+    <CodeGroup>
+    ```bash Linux/Mac
+    touch .env
+    ```
+
+    ```bash Windows
+    type nul > .env
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Add database configuration">
+    Add your database credentials to the `.env` file:
+
+    ```env .env
+    DB_URL=jdbc:postgresql://localhost:5432/duit
+    DB_USER=tu_usuario
+    DB_PASS=tu_contraseña
+    ```
+
+    <Accordion title="Using cloud PostgreSQL (e.g., Neon)">
+      If you're using a cloud PostgreSQL provider like Neon, your connection string will look different:
+
+      ```env .env
+      DB_URL=jdbc:postgresql://ep-example-123456.us-east-2.aws.neon.tech:5432/duit?sslmode=require
+      DB_USER=your_neon_user
+      DB_PASS=your_neon_password
+      ```
+
+      Make sure to include `?sslmode=require` for secure connections.
+    </Accordion>
+  </Step>
+
+  <Step title="Secure your .env file">
+    <Warning>
+      Never commit your `.env` file to version control! Ensure it's listed in `.gitignore`.
+    </Warning>
+
+    Verify `.env` is in your `.gitignore`:
+
+    ```bash .gitignore
+    .env
+    ```
+  </Step>
+</Steps>
+
+## Application Properties
+
+The `application.properties` file contains non-sensitive application settings. Here are the key configurations:
+
+### Database Configuration
+
+The application uses environment variables for database connection:
+
+```properties src/main/resources/application.properties
+# Database connection
+spring.datasource.url=${DB_URL}
+spring.datasource.username=${DB_USER}
+spring.datasource.password=${DB_PASS}
+spring.datasource.driver-class-name=org.postgresql.Driver
+```
+
+### Connection Pool Settings (HikariCP)
+
+Duit uses HikariCP for efficient database connection pooling:
+
+```properties src/main/resources/application.properties
+# HikariCP configuration (optimized for cloud databases like Neon)
+spring.datasource.hikari.maximum-pool-size=20
+spring.datasource.hikari.minimum-idle=5
+spring.datasource.hikari.idle-timeout=300000
+spring.datasource.hikari.max-lifetime=600000
+spring.datasource.hikari.connection-timeout=30000
+spring.datasource.hikari.validation-timeout=5000
+spring.datasource.hikari.leak-detection-threshold=60000
+```
+
+<Info>
+  These HikariCP settings are optimized for cloud databases with connection limits. Adjust them based on your database provider's recommendations.
+</Info>
+
+### JPA/Hibernate Configuration
+
+```properties src/main/resources/application.properties
+# JPA/Hibernate settings
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.properties.hibernate.jdbc.time_zone=Europe/Madrid
+spring.jpa.open-in-view=true
+```
+
+<Accordion title="Understanding ddl-auto modes">
+  The `spring.jpa.hibernate.ddl-auto=update` setting automatically updates your database schema:
+
+  - **update**: Updates schema without data loss (recommended for development)
+  - **create**: Drops and recreates schema on startup (development only)
+  - **create-drop**: Drops schema on shutdown (testing only)
+  - **validate**: Validates schema without changes (production)
+  - **none**: No schema management (production)
+
+  <Warning>
+    For production, consider using `validate` or `none` and managing schema changes with migration tools like Flyway or Liquibase.
+  </Warning>
+</Accordion>
+
+### Server Configuration
+
+```properties src/main/resources/application.properties
+# Server settings
+server.port=8080
+server.servlet.context-path=/
+server.servlet.encoding.charset=UTF-8
+server.servlet.encoding.enabled=true
+```
+
+### Session Configuration
+
+```properties src/main/resources/application.properties
+# Session management
+server.servlet.session.timeout=30m
+server.servlet.session.cookie.max-age=1800
+```
+
+### Thymeleaf Configuration
+
+```properties src/main/resources/application.properties
+# Thymeleaf template engine
+spring.thymeleaf.cache=false
+spring.thymeleaf.mode=HTML
+spring.thymeleaf.encoding=UTF-8
+```
+
+<Info>
+  `spring.thymeleaf.cache=false` disables template caching for development. Enable it in production for better performance.
+</Info>
+
+### Error Handling Configuration
+
+```properties src/main/resources/application.properties
+# Error handling (prevents information leakage)
+server.error.whitelabel.enabled=false
+server.error.include-message=never
+server.error.include-binding-errors=never
+server.error.include-stacktrace=never
+```
+
+<Warning>
+  These settings prevent sensitive error information from being exposed to users in production. Custom error pages handle 403, 404, and 500 errors.
+</Warning>
+
+## Security Settings
+
+Duit uses Spring Security with the following features:
+
+- **BCrypt password encryption**: All passwords are hashed using BCrypt
+- **Role-based access control**: Routes are protected based on user roles
+  - `/admin/**` - Administrator access only
+  - `/user/**` - Regular users
+  - `/professional/**` - Professional users
+- **Custom error pages**: 403 (Forbidden), 404 (Not Found), 500 (Server Error)
+
+<Info>
+  Security configuration is managed in Java code, not in `application.properties`. See the [Security documentation](/architecture/security) for details.
+</Info>
+
+## Development vs Production
+
+<CodeGroup>
+```properties Development
+# Enable detailed logging and disable caching for faster development
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+spring.thymeleaf.cache=false
+spring.jpa.hibernate.ddl-auto=update
+```
+
+```properties Production
+# Optimize for performance and security
+spring.jpa.show-sql=false
+spring.thymeleaf.cache=true
+spring.jpa.hibernate.ddl-auto=validate
+server.error.include-message=never
+server.error.include-stacktrace=never
+```
+</CodeGroup>
+
+## Verify Configuration
+
+After configuring your environment, test your setup:
+
+<CodeGroup>
+```bash Linux/Mac
+./mvnw spring-boot:run
+```
+
+```bash Windows
+mvnw.cmd spring-boot:run
+```
+</CodeGroup>
+
+If configuration is correct, you should see:
+
+```
+Started DuitApplication in X.XXX seconds
+```
+
+And the application will be accessible at `http://localhost:8080`.
+
+## Common Configuration Issues
+
+<AccordionGroup>
+  <Accordion title="Database connection failed">
+    **Error**: `Connection refused` or `Authentication failed`
+
+    **Solutions**:
+    - Verify PostgreSQL is running: `pg_isready`
+    - Check database credentials in `.env`
+    - Ensure database `duit` exists
+    - For cloud databases, verify SSL settings and connection string
+  </Accordion>
+
+  <Accordion title="Port already in use">
+    **Error**: `Port 8080 is already in use`
+
+    **Solution**: Change the port in `application.properties`:
+    ```properties
+    server.port=8081
+    ```
+  </Accordion>
+
+  <Accordion title="Environment variables not loading">
+    **Error**: Variables show as `${DB_URL}` in logs
+
+    **Solutions**:
+    - Ensure `.env` file is in the project root
+    - Verify `spring-dotenv` dependency is in `pom.xml`
+    - Restart your IDE/terminal after creating `.env`
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+With your application configured, you're ready to deploy! Proceed to the [Deployment](/getting-started/deployment) guide to run Duit locally or in production.

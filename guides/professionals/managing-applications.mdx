@@ -1,0 +1,175 @@
+---
+title: 'Managing Job Applications'
+description: 'Learn how to apply to jobs and manage your applications on Duit'
+---
+
+As a professional, you can browse available service requests and submit applications to jobs that match your skills.
+
+## Searching for Jobs
+
+Use the job search interface to find opportunities that match your expertise:
+
+### Available Filters
+
+- **Text Search** (`textoBusqueda`): Search by keywords in job titles and descriptions
+- **Category** (`categoriaId`): Filter by specific service categories
+- **Postal Code** (`codigoPostal`): Find jobs in your area
+
+Access the search interface at `GET /professional/search` (ProfessionalController.java:39)
+
+<Note>
+  You must have a complete professional profile and address configured before you can apply to jobs.
+</Note>
+
+## Submitting an Application
+
+When you find a job you want to apply for, submit your application with the following information:
+
+<ParamField path="ofertaId" type="Long" required>
+  The ID of the service request you're applying to
+</ParamField>
+
+<ParamField path="precio" type="decimal" required>
+  Your proposed price for the job
+  - Minimum: €1.00
+  - Maximum: €99,999.00
+  - Must be a positive value
+  - Use comma or period as decimal separator (both are accepted)
+</ParamField>
+
+<ParamField path="mensaje" type="string" optional>
+  Optional message to the client
+  - Maximum length: 1000 characters
+  - Use this to explain your approach, highlight relevant experience, or ask clarifying questions
+</ParamField>
+
+### Application Workflow
+
+<Steps>
+  <Step title="Find a Job">
+    Browse available jobs using the search filters at `/professional/search`
+  </Step>
+
+  <Step title="Review Requirements">
+    Ensure the job matches your skills and the client's requirements
+  </Step>
+
+  <Step title="Submit Application">
+    Submit via `POST /professional/postular/{ofertaId}` with your proposed price and optional message
+  </Step>
+
+  <Step title="Wait for Response">
+    Your application status will be `PENDING` until the client reviews it
+  </Step>
+</Steps>
+
+## Application States
+
+Applications can have the following statuses (defined in JobApplication.Status):
+
+| Status | Description |
+|--------|-------------|
+| `PENDING` | Application submitted, waiting for client response |
+| `ACCEPTED` | Client accepted your application - job will be created |
+| `REJECTED` | Client declined your application |
+| `WITHDRAWN` | You withdrew your application before client responded |
+
+## Managing Your Applications
+
+View all your applications at `GET /professional/applications` (ProfessionalController.java:82)
+
+This page shows:
+- All your job applications with their current status
+- Jobs currently in progress
+- Application details including proposed price and messages
+
+### Editing Pending Applications
+
+You can modify applications that are still in `PENDING` status:
+
+**Endpoint**: `POST /professional/applications/edit/{postulacionId}`
+
+**What you can change**:
+- Proposed price (`precio`)
+- Message to client (`mensaje`)
+
+<Warning>
+  You can only edit applications with `PENDING` status. Once accepted, rejected, or withdrawn, applications cannot be modified.
+</Warning>
+
+Implementation in JobApplicationService.java:55:
+```java
+public JobApplication editarPostulacion(Long postulacionId, AppUser usuario, 
+    BigDecimal precio, String mensaje)
+```
+
+### Withdrawing Applications
+
+If you no longer want to pursue a job, you can withdraw your application while it's still `PENDING`:
+
+**Endpoint**: `POST /professional/applications/withdraw/{postulacionId}`
+
+This will:
+1. Change application status to `WITHDRAWN`
+2. Set the `respondedAt` timestamp
+3. Notify the client that you're no longer interested
+
+Implementation in JobApplicationService.java:82
+
+## Validation Rules
+
+The system enforces several validation rules when applying:
+
+### Application Requirements
+
+✅ **Must Have**:
+- Complete professional profile
+- Address configured in your user profile
+
+❌ **Cannot Apply If**:
+- The service request is not `PUBLISHED`
+- You are the owner of the service request
+- You have already applied to this job
+- Your profile is incomplete
+
+### Price Validation
+
+From ProfessionalController.java:168:
+```java
+if (precio.compareTo(BigDecimal.ONE) < 0 || 
+    precio.compareTo(new BigDecimal("99999")) > 0) {
+    throw new IllegalArgumentException(
+        "El precio debe estar entre 1€ y 99.999€"
+    );
+}
+```
+
+## Error Messages
+
+Common errors you might encounter:
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| "No tienes un perfil profesional configurado" | Professional profile incomplete | Complete your profile at `/profile/professional` |
+| "No tienes una direccion configurada" | Address not set | Add your address in user profile settings |
+| "La oferta no está disponible" | Job not published or no longer available | Find another job to apply to |
+| "No puedes postularte a tu propia oferta" | You own the service request | You cannot apply to your own jobs |
+| "Ya te has postulado a esta oferta" | Duplicate application | You can only apply once per job |
+| "El precio debe ser mayor a 0" | Invalid price | Enter a valid positive price |
+| "Solo puedes modificar postulaciones en estado pendiente" | Application no longer pending | Cannot edit accepted/rejected/withdrawn applications |
+
+## Related Endpoints
+
+All from ProfessionalController.java:
+- `GET /professional/search` - Browse available jobs (line 39)
+- `POST /professional/search` - Search with filters (line 60)
+- `POST /professional/postular/{ofertaId}` - Submit application (line 154)
+- `GET /professional/applications` - View your applications (line 82)
+- `POST /professional/applications/edit/{postulacionId}` - Edit pending application (line 101)
+- `POST /professional/applications/withdraw/{postulacionId}` - Withdraw application (line 135)
+
+## Next Steps
+
+- [View your job history](/guides/professionals/job-history)
+- [Learn about ratings and reputation](/guides/professionals/job-history#ratings-and-reputation)
+- [Understand job statuses](/guides/professionals/job-history#job-statuses)

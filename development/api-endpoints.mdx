@@ -1,0 +1,186 @@
+---
+title: 'API Endpoints Reference'
+description: 'Complete HTTP endpoint reference for all controllers in the Duit application'
+---
+
+# API Endpoints Reference
+
+This page documents all HTTP endpoints available in the Duit application, organized by controller.
+
+## Public Endpoints
+
+### PublicController
+Handles publicly accessible pages without authentication.
+
+| Method | Path | Description | Controller Method |
+|--------|------|-------------|-------------------|
+| GET | `/`, `/index` | Main landing page | `showMainPage()` |
+| GET | `/login` | Login page with error/logout handling | `showLoginPage()` |
+| GET | `/terms` | Terms and conditions page | `showTermsPage()` |
+| GET | `/privacy` | Privacy policy page | `showPrivacyPage()` |
+| GET | `/help` | Help and support page | `showHelpPage()` |
+| GET | `/signup` | User registration form | `showRegistrationForm()` |
+| POST | `/register` | Process user registration | `processUserRegistration()` |
+
+## Dashboard
+
+### DashboardController
+Manages the main dashboard page for authenticated users.
+
+| Method | Path | Description | Controller Method |
+|--------|------|-------------|-------------------|
+| GET | `/home` | Main dashboard page | `mostrarPaginaInicio()` |
+
+## User Profile Management
+
+### ProfileController
+Handles profile editing and viewing for both regular users and professionals.
+
+**Base Path:** `/profile`
+
+| Method | Path | Description | Controller Method |
+|--------|------|-------------|-------------------|
+| GET | `/profile/edit` | Show user profile edit form | `edit()` |
+| POST | `/profile/edit` | Update user profile | `updateProfile()` |
+| GET | `/profile/professional`, `/profile/profesional` | Show professional profile | `professional()` |
+| POST | `/profile/professional`, `/profile/profesional` | Update professional profile | `updateProfessionalProfile()` |
+| POST | `/profile/delete-account` | Deactivate user account | `deleteAccount()` |
+
+## Service Requests
+
+### RequestFormController
+Manages creation and editing of service requests.
+
+**Base Path:** `/requests`
+
+| Method | Path | Description | Controller Method |
+|--------|------|-------------|-------------------|
+| GET | `/requests/request` | Show request form (create or edit) | `showRequestForm()` |
+| POST | `/requests/request` | Submit request form | `submitRequestForm()` |
+
+### MyRequestsController
+Handles user's own service requests and jobs.
+
+**Base Path:** `/requests`
+
+| Method | Path | Description | Controller Method |
+|--------|------|-------------|-------------------|
+| GET | `/requests/my-requests` | Show user's requests and jobs | `showMyRequests()` |
+| POST | `/requests/publish/{id}` | Publish a draft request | `publishRequest()` |
+| POST | `/requests/unpublish/{id}` | Unpublish a request | `unpublishRequest()` |
+| POST | `/requests/cancel/{id}` | Cancel a request | `cancelRequest()` |
+| POST | `/requests/reactivate/{id}` | Reactivate a cancelled request | `reactivateRequest()` |
+| POST | `/requests/delete/{id}` | Delete a request | `deleteRequest()` |
+| POST | `/requests/complete/{jobId}` | Mark job as completed | `completeJob()` |
+| POST | `/requests/pause/{jobId}` | Pause a job | `pauseJob()` |
+| POST | `/requests/cancel-job/{jobId}` | Cancel a job | `cancelJob()` |
+| POST | `/requests/complete-request/{id}` | Complete a request | `completeRequest()` |
+| POST | `/requests/accept-application` | Accept an application | `acceptApplicationWithParams()` |
+| POST | `/requests/reject-application` | Reject an application | `rejectApplicationWithParams()` |
+| GET | `/requests/applications/{requestId}` | View applications for a request | `viewApplications()` |
+
+## Professional Features
+
+### ProfessionalController
+Handles professional search, applications, and job management.
+
+**Base Path:** `/professional`
+
+| Method | Path | Description | Controller Method |
+|--------|------|-------------|-------------------|
+| GET | `/professional/search` | Search for service requests | `searchJobs()` |
+| POST | `/professional/search` | Search with filters | `searchJobsWithForm()` |
+| GET | `/professional/applications` | View professional's applications | `verPostulaciones()` |
+| POST | `/professional/postular/{ofertaId}` | Apply to a service request | `postularse()` |
+| POST | `/professional/applications/edit/{postulacionId}` | Edit an application | `editarPostulacion()` |
+| POST | `/professional/applications/withdraw/{postulacionId}` | Withdraw an application | `retirarPostulacion()` |
+
+### PostulacionesController
+Manages applications and job state transitions.
+
+**Base Path:** `/jobs/applications`
+
+| Method | Path | Description | Controller Method |
+|--------|------|-------------|-------------------|
+| GET | `/jobs/applications/{id}` | View applications for a request | `verPostulacionesSolicitud()` |
+| POST | `/jobs/applications/aceptar/{postulacionId}` | Accept an application | `aceptarPostulacionEspecifica()` |
+| POST | `/jobs/applications/rechazar/{postulacionId}` | Reject an application | `rechazarPostulacionEspecifica()` |
+| POST | `/jobs/applications/finalizar/{jobId}` | Finalize a completed job | `finalizarTrabajoCompletado()` |
+| POST | `/jobs/applications/pausar/{jobId}` | Pause a job | `pausarTrabajoEnProgreso()` |
+| POST | `/jobs/applications/reanudar/{jobId}` | Resume a paused job | `reanudarTrabajoPausado()` |
+| POST | `/jobs/applications/iniciar/{jobId}` | Start a job | `iniciarTrabajoCreado()` |
+| POST | `/jobs/applications/cancelar/{jobId}` | Cancel a job | `cancelarTrabajo()` |
+
+## Ratings
+
+### RatingsController
+Manages rating creation for completed jobs.
+
+**Base Path:** `/ratings`
+
+| Method | Path | Description | Controller Method |
+|--------|------|-------------|-------------------|
+| POST | `/ratings/crear` | Create a new rating | `crearNuevaValoracion()` |
+
+## Shared Features
+
+### SharedController
+Handles pages accessible by all authenticated users.
+
+**Base Path:** `/shared`
+
+| Method | Path | Description | Controller Method |
+|--------|------|-------------|-------------------|
+| GET | `/shared/history` | View job history | `mostrarHistorial()` |
+| GET | `/shared/ratings` | View ratings page | `mostrarValoraciones()` |
+
+## Administration
+
+### AdminController
+Manages administrative pages.
+
+**Base Path:** `/admin`
+
+| Method | Path | Description | Controller Method |
+|--------|------|-------------|-------------------|
+| GET | `/admin/users` | User management page | `mostrarGestionUsuarios()` |
+| GET | `/admin/stats` | Statistics page | `mostrarEstadisticas()` |
+
+### CategoryController
+Handles category management (CRUD operations).
+
+**Base Path:** `/admin`
+
+| Method | Path | Description | Controller Method |
+|--------|------|-------------|-------------------|
+| GET | `/admin/categories` | Category management page | `categoriesPage()` |
+| POST | `/admin/categories` | Create or update category | `categorySave()` |
+| GET | `/admin/edit/{id}` | Load category for editing | `categoryForEdit()` |
+| GET | `/admin/delete/{id}` | Delete a category | `deleteCategory()` |
+| GET | `/admin/toggle/{id}` | Toggle category active status | `toggleCategoryStatus()` |
+
+## Error Handling
+
+### CustomErrorController
+Handles custom error pages.
+
+| Method | Path | Description | Controller Method |
+|--------|------|-------------|-------------------|
+| GET | `/error/403` | Forbidden access page | `forbidden()` |
+| ALL | `/error` | General error handler (404, 500) | `handleError()` |
+
+## Controller Advice
+
+### UserControllerAdvice
+Global controller advice that adds the authenticated user to all views.
+
+**Model Attribute:** Adds `usuario` (current authenticated user) to all view models automatically.
+
+## Notes
+
+- All endpoints under `/admin/**` require ADMIN role
+- All endpoints under `/professional/**` require PROFESSIONAL role
+- All endpoints under `/user/**` and `/shared/**` require authentication
+- Most POST endpoints redirect with flash attributes for success/error messages
+- Path variables are denoted with `{variableName}` syntax
+- Query parameters are handled via `@RequestParam` annotations

@@ -1,0 +1,470 @@
+---
+title: Managing Jobs
+description: Learn how to manage job applications and track active jobs on Duit
+---
+
+## Overview
+
+Once you publish a service request, professionals can apply with their proposed price and message. You'll review applications, select a professional, and manage the job through completion.
+
+## Viewing Your Requests
+
+Access your service requests at `/requests/my-requests`:
+
+```java MyRequestsController.java:42-55
+@GetMapping("/my-requests")
+public String showMyRequests(Authentication auth, Model model) {
+    // Get logged in user
+    AppUser usuarioLogueado = authService.getAuthenticatedUser(auth);
+
+    List<ServiceRequest> solicitudesUsuario = serviceRequestService.getMyRequests();
+    List<ServiceJob> trabajosUsuario = serviceJobRepository.findByCliente(usuarioLogueado);
+
+    // Prepare data for view
+    model.addAttribute("solicitudesExistentes", solicitudesUsuario);
+    model.addAttribute("trabajosDelCliente", trabajosUsuario);
+
+    return "jobs/myrequest";
+}
+```
+
+This page shows:
+- All your service requests (any status)
+- Active jobs in progress
+- Request status and application counts
+
+## Managing Request Status
+
+You can change the status of your requests based on their current state.
+
+### Publishing a Draft
+
+Make a draft request visible to professionals:
+
+```java MyRequestsController.java:60-81
+@PostMapping("/publish/{id}")
+public String publishRequest(@PathVariable Long id,
+        Authentication auth,
+        RedirectAttributes redirectAttributes) {
+    try {
+        // Get logged in user
+        AppUser usuarioLogueado = authService.getAuthenticatedUser(auth);
+
+        // Publish the request using the service
+        serviceRequestService.publishRequest(id, usuarioLogueado);
+
+        // Prepare success response
+        String mensajeExito = "Solicitud publicada correctamente.";
+        redirectAttributes.addFlashAttribute("success", mensajeExito);
+        return "redirect:/requests/my-requests";
+
+    } catch (IllegalArgumentException error) {
+        // Handle publication errors
+        redirectAttributes.addFlashAttribute("error", error.getMessage());
+        return "redirect:/requests/my-requests";
+    }
+}
+```
+
+### Unpublishing a Request
+
+Hide a published request from professionals (returns to DRAFT):
+
+```java MyRequestsController.java:86-107
+@PostMapping("/unpublish/{id}")
+public String unpublishRequest(@PathVariable Long id,
+        Authentication auth,
+        RedirectAttributes redirectAttributes) {
+    try {
+        // Get logged in user
+        AppUser usuarioLogueado = authService.getAuthenticatedUser(auth);
+
+        // Unpublish the request using the service
+        serviceRequestService.unpublishRequest(id, usuarioLogueado);
+
+        // Prepare success response
+        String mensajeExito = "Solicitud despublicada correctamente.";
+        redirectAttributes.addFlashAttribute("success", mensajeExito);
+        return "redirect:/requests/my-requests";
+
+    } catch (IllegalArgumentException error) {
+        // Handle unpublish errors
+        redirectAttributes.addFlashAttribute("error", error.getMessage());
+        return "redirect:/requests/my-requests";
+    }
+}
+```
+
+### Cancelling a Request
+
+Cancel a request you no longer need:
+
+```java MyRequestsController.java:112-133
+@PostMapping("/cancel/{id}")
+public String cancelRequest(@PathVariable Long id,
+        Authentication auth,
+        RedirectAttributes redirectAttributes) {
+    try {
+        // Get logged in user
+        AppUser usuarioLogueado = authService.getAuthenticatedUser(auth);
+
+        // Cancel the request using the service
+        serviceRequestService.cancelRequest(id, usuarioLogueado);
+
+        // Prepare success response
+        String mensajeExito = "Solicitud cancelada correctamente.";
+        redirectAttributes.addFlashAttribute("success", mensajeExito);
+        return "redirect:/requests/my-requests";
+
+    } catch (IllegalArgumentException error) {
+        // Handle cancellation errors
+        redirectAttributes.addFlashAttribute("error", error.getMessage());
+        return "redirect:/requests/my-requests";
+    }
+}
+```
+
+### Reactivating a Cancelled Request
+
+Bring a cancelled request back to published status:
+
+```java MyRequestsController.java:138-159
+@PostMapping("/reactivate/{id}")
+public String reactivateRequest(@PathVariable Long id,
+        Authentication auth,
+        RedirectAttributes redirectAttributes) {
+    try {
+        // Get logged in user
+        AppUser usuarioLogueado = authService.getAuthenticatedUser(auth);
+
+        // Reactivate the request using the service
+        serviceRequestService.reactivateRequest(id, usuarioLogueado);
+
+        // Prepare success response
+        String mensajeExito = "Solicitud reactivada correctamente.";
+        redirectAttributes.addFlashAttribute("success", mensajeExito);
+        return "redirect:/requests/my-requests";
+
+    } catch (IllegalArgumentException error) {
+        // Handle reactivation errors
+        redirectAttributes.addFlashAttribute("error", error.getMessage());
+        return "redirect:/requests/my-requests";
+    }
+}
+```
+
+### Deleting a Request
+
+Permanently delete a request:
+
+```java MyRequestsController.java:164-185
+@PostMapping("/delete/{id}")
+public String deleteRequest(@PathVariable Long id,
+        Authentication auth,
+        RedirectAttributes redirectAttributes) {
+    try {
+        // Get logged in user
+        AppUser usuarioLogueado = authService.getAuthenticatedUser(auth);
+
+        // Delete the request using the service
+        serviceRequestService.deleteRequest(id, usuarioLogueado);
+
+        // Prepare success response
+        String mensajeExito = "Solicitud eliminada correctamente.";
+        redirectAttributes.addFlashAttribute("success", mensajeExito);
+        return "redirect:/requests/my-requests";
+
+    } catch (IllegalArgumentException error) {
+        // Handle deletion errors
+        redirectAttributes.addFlashAttribute("error", error.getMessage());
+        return "redirect:/requests/my-requests";
+    }
+}
+```
+
+<Warning>
+Deleting a request is permanent and cannot be undone. Consider cancelling instead if you might need the information later.
+</Warning>
+
+## Viewing Applications
+
+Once your request is published, professionals will submit applications. View them at `/requests/applications/{requestId}`:
+
+```java MyRequestsController.java:355-372
+@GetMapping("/applications/{requestId}")
+public String viewApplications(@PathVariable Long requestId, Model model,
+        RedirectAttributes redirectAttributes) {
+    try {
+        List<JobApplication> aplicaciones = serviceRequestService.getApplicationsForMyRequest(requestId);
+        ServiceRequest solicitud = serviceRequestService.getMyRequestById(requestId);
+
+        model.addAttribute("aplicaciones", aplicaciones);
+        model.addAttribute("solicitud", solicitud);
+
+        return "jobs/applications";
+
+    } catch (RuntimeException error) {
+        redirectAttributes.addFlashAttribute("error", error.getMessage());
+        return "redirect:/requests/my-requests";
+    }
+}
+```
+
+### Application Information
+
+Each application contains:
+
+```java JobApplication.java:21-76
+@Entity
+@Table(name = "job_application")
+public class JobApplication extends BaseEntity {
+
+    public enum Status {
+        PENDING, ACCEPTED, REJECTED, WITHDRAWN
+    }
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "id_request", nullable = false)
+    private ServiceRequest request;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "id_professional", nullable = false)
+    private ProfessionalProfile professional;
+
+    @Size(max = 1000, message = "El mensaje no puede exceder los 1000 caracteres")
+    @Column(name = "message", columnDefinition = "TEXT")
+    private String message;
+
+    @DecimalMin(value = "0.00", message = "El precio propuesto debe ser positivo")
+    @Column(name = "proposed_price", precision = 8, scale = 2)
+    private BigDecimal proposedPrice;
+
+    @Column(name = "applied_at")
+    private LocalDateTime appliedAt;
+
+    @Column(name = "responded_at")
+    private LocalDateTime respondedAt;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private Status status = Status.PENDING;
+}
+```
+
+For each application you can see:
+- Professional's profile and ratings
+- Proposed price
+- Personal message
+- Application date
+- Application status (PENDING, ACCEPTED, REJECTED, WITHDRAWN)
+
+## Accepting an Application
+
+When you find the right professional, accept their application:
+
+```java MyRequestsController.java:320-334
+@PostMapping("/accept-application")
+public String acceptApplicationWithParams(@RequestParam Long requestId,
+        @RequestParam Long applicationId,
+        RedirectAttributes redirectAttributes) {
+    try {
+        serviceRequestService.acceptRequest(requestId, applicationId);
+
+        redirectAttributes.addFlashAttribute("success", "Aplicación aceptada correctamente.");
+        return "redirect:/requests/my-requests";
+
+    } catch (RuntimeException error) {
+        redirectAttributes.addFlashAttribute("error", error.getMessage());
+        return "redirect:/requests/my-requests";
+    }
+}
+```
+
+Accepting an application:
+1. Creates a new `ServiceJob` with status `CREATED`
+2. Changes the request status to `IN_PROGRESS`
+3. Sets the application status to `ACCEPTED`
+4. Automatically rejects all other pending applications
+
+## Rejecting an Application
+
+If an application doesn't meet your needs:
+
+```java MyRequestsController.java:336-350
+@PostMapping("/reject-application")
+public String rejectApplicationWithParams(@RequestParam Long requestId,
+        @RequestParam Long applicationId,
+        RedirectAttributes redirectAttributes) {
+    try {
+        serviceRequestService.rejectRequest(requestId, applicationId);
+
+        redirectAttributes.addFlashAttribute("success", "Aplicación rechazada correctamente.");
+        return "redirect:/requests/applications/" + requestId;
+
+    } catch (RuntimeException error) {
+        redirectAttributes.addFlashAttribute("error", error.getMessage());
+        return "redirect:/requests/applications/" + requestId;
+    }
+}
+```
+
+## Managing Active Jobs
+
+Once you accept an application, a `ServiceJob` is created. Jobs can have these statuses:
+
+```java ServiceJob.java:26-28
+public enum Status {
+    CREATED, IN_PROGRESS, COMPLETED, CANCELLED, PAUSED
+}
+```
+
+### Completing a Job
+
+When the work is finished, mark the job as complete:
+
+```java MyRequestsController.java:190-206
+@PostMapping("/complete/{jobId}")
+public String completeJob(@PathVariable Long jobId, Authentication auth) {
+    // Get logged in user
+    AppUser usuarioLogueado = authService.getAuthenticatedUser(auth);
+
+    // Find and validate the job
+    ServiceJob trabajoEncontrado = buscarYValidarTrabajo(jobId, usuarioLogueado);
+    if (trabajoEncontrado == null) {
+        return "redirect:/requests/my-requests";
+    }
+
+    // Complete the job
+    completarTrabajoEspecifico(trabajoEncontrado);
+
+    // Redirect to ratings
+    return "redirect:/shared/ratings?jobId=" + jobId;
+}
+```
+
+Completing a job:
+1. Sets the job status to `COMPLETED`
+2. Records the end date
+3. Redirects you to rate the professional
+
+### Pausing a Job
+
+Temporarily pause work in progress:
+
+```java MyRequestsController.java:212-226
+@PostMapping("/pause/{jobId}")
+public String pauseJob(@PathVariable Long jobId, Authentication auth) {
+    // Get logged in user
+    AppUser usuarioLogueado = authService.getAuthenticatedUser(auth);
+
+    // Find and validate the job
+    ServiceJob trabajoEncontrado = buscarYValidarTrabajo(jobId, usuarioLogueado);
+    if (trabajoEncontrado == null) {
+        return "redirect:/requests/my-requests";
+    }
+
+    // Pause the job
+    pausarTrabajoEspecifico(trabajoEncontrado);
+
+    return "redirect:/requests/my-requests";
+}
+```
+
+### Cancelling a Job
+
+Cancel a job that's no longer needed:
+
+```java MyRequestsController.java:232-246
+@PostMapping("/cancel-job/{jobId}")
+public String cancelJob(@PathVariable Long jobId, Authentication auth) {
+    // Get logged in user
+    AppUser usuarioLogueado = authService.getAuthenticatedUser(auth);
+
+    // Find and validate the job
+    ServiceJob trabajoEncontrado = buscarYValidarTrabajo(jobId, usuarioLogueado);
+    if (trabajoEncontrado == null) {
+        return "redirect:/requests/my-requests";
+    }
+
+    // Cancel the job
+    cancelarTrabajoEspecifico(trabajoEncontrado);
+
+    return "redirect:/requests/my-requests";
+}
+```
+
+## Job Lifecycle
+
+Understand the complete job workflow:
+
+<Steps>
+  <Step title="Job Created">
+    When you accept an application, a job is created with status `CREATED`. The service request becomes `IN_PROGRESS`.
+  </Step>
+  
+  <Step title="Work Begins">
+    The professional starts working. You can update the job status to `IN_PROGRESS` to track active work.
+  </Step>
+  
+  <Step title="Work Completed">
+    When finished, mark the job as `COMPLETED`. This records the end date and prompts you to rate the professional.
+  </Step>
+  
+  <Step title="Rating">
+    After completion, you can rate the professional and leave a review.
+  </Step>
+</Steps>
+
+### Alternative Outcomes
+
+- **Paused**: Work is temporarily stopped but may resume later
+- **Cancelled**: Job cancelled before completion (by client or professional)
+
+## Best Practices
+
+<Tip>
+**Review all applications carefully**
+
+Compare proposed prices, professional ratings, and messages before making a decision.
+</Tip>
+
+<Tip>
+**Communicate with professionals**
+
+If you have questions about an application, reach out to the professional before accepting.
+</Tip>
+
+<Tip>
+**Complete jobs promptly**
+
+Mark jobs as complete as soon as work finishes so you can rate the professional while the experience is fresh.
+</Tip>
+
+<Warning>
+**Only you can manage your jobs**
+
+The system validates that you're the client who created the request before allowing job management actions.
+</Warning>
+
+## Application Status Transitions
+
+Applications move through these states:
+
+```
+PENDING → ACCEPTED (creates ServiceJob)
+       → REJECTED (by client)
+       → WITHDRAWN (by professional)
+```
+
+- **PENDING**: Professional has applied, waiting for client response
+- **ACCEPTED**: Client selected this professional (other applications auto-rejected)
+- **REJECTED**: Client declined this application
+- **WITHDRAWN**: Professional cancelled their own application
+
+## Related
+
+- [Creating Service Requests](/guides/clients/creating-requests)
+- [Rating Professionals](/guides/clients/rating-professionals)
+- [ServiceJob Entity](/architecture/entities#servicejob)
+- [JobApplication Entity](/architecture/entities#jobapplication)

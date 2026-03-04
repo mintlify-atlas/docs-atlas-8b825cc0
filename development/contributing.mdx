@@ -1,0 +1,441 @@
+---
+title: 'Contributing Guide'
+description: 'Guidelines for contributing to the Duit project'
+---
+
+# Contributing Guide
+
+Thank you for your interest in contributing to Duit! This guide will help you get started.
+
+## Table of Contents
+
+- [Getting Started](#getting-started)
+- [Development Setup](#development-setup)
+- [Code Style](#code-style)
+- [Making Changes](#making-changes)
+- [Submitting Pull Requests](#submitting-pull-requests)
+- [Issue Reporting](#issue-reporting)
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+Before contributing, ensure you have:
+
+- **Java 21** or higher
+- **Maven** (or use the included Maven wrapper `mvnw`)
+- **PostgreSQL** database (local or remote)
+- **Git** for version control
+- A code editor (IntelliJ IDEA, VS Code, Eclipse, etc.)
+
+### Fork and Clone
+
+1. Fork the repository on GitHub
+2. Clone your fork locally:
+```bash
+git clone <url-of-your-fork>
+cd Duit
+```
+
+3. Add the original repository as upstream:
+```bash
+git remote add upstream <url-of-original-repository>
+```
+
+---
+
+## Development Setup
+
+### Database Configuration
+
+1. Create a PostgreSQL database:
+```sql
+CREATE DATABASE duit;
+```
+
+2. Create a `.env` file in the project root:
+```env
+DB_URL=jdbc:postgresql://localhost:5432/duit
+DB_USER=your_username
+DB_PASS=your_password
+```
+
+### Running the Application
+
+**Linux/Mac:**
+```bash
+./mvnw spring-boot:run
+```
+
+**Windows:**
+```bash
+mvnw.cmd spring-boot:run
+```
+
+The application will be available at `http://localhost:8080`
+
+### Building the Project
+
+```bash
+./mvnw clean package
+```
+
+---
+
+## Code Style
+
+### General Guidelines
+
+1. **Follow existing patterns** - Look at similar code in the project
+2. **Keep it simple** - Prefer clarity over cleverness
+3. **Write self-documenting code** - Use meaningful names
+4. **Add comments for complex logic** - Explain the "why", not the "what"
+
+### Java Code Style
+
+#### Naming Conventions
+
+- **Classes**: PascalCase (`UserController`, `RequestService`)
+- **Methods**: camelCase (`getUserById`, `saveRequest`)
+- **Variables**: camelCase (`userName`, `solicitudId`)
+- **Constants**: UPPER_SNAKE_CASE (`MAX_RETRY_ATTEMPTS`)
+- **Packages**: lowercase (`es.duit.app.controller`)
+
+#### Code Structure
+
+**Controllers:**
+```java
+@Controller
+@RequestMapping("/path")
+public class MyController {
+    
+    private final MyService myService;
+    
+    public MyController(MyService myService) {
+        this.myService = myService;
+    }
+    
+    @GetMapping("/endpoint")
+    public String handleRequest(Model model) {
+        // Implementation
+        return "view-name";
+    }
+}
+```
+
+**Services:**
+```java
+@Service
+@Transactional
+@RequiredArgsConstructor
+public class MyService {
+    
+    private final MyRepository myRepository;
+    
+    public Entity methodName(Parameters params) {
+        // Validation
+        // Business logic
+        // Return result
+    }
+}
+```
+
+#### Documentation Comments
+
+Use clear section headers in code:
+```java
+// ============================================================================
+// SECTION TITLE - Brief description
+// ============================================================================
+```
+
+### Thymeleaf Templates
+
+- Use semantic HTML5 elements
+- Follow existing layout patterns
+- Use Thymeleaf attributes correctly: `th:text`, `th:href`, `th:if`
+- Keep JavaScript minimal and in separate files when possible
+
+---
+
+## Making Changes
+
+### Branching Strategy
+
+1. Create a feature branch from `main`:
+```bash
+git checkout -b feature/my-feature
+```
+
+Or for bug fixes:
+```bash
+git checkout -b fix/bug-description
+```
+
+2. Make your changes in small, logical commits
+
+3. Keep your branch up to date:
+```bash
+git fetch upstream
+git rebase upstream/main
+```
+
+### Commit Messages
+
+Write clear, descriptive commit messages:
+
+**Good examples:**
+```
+Add email validation to user registration
+Fix null pointer in RequestService.saveRequest
+Refactor JobService to improve readability
+Update category page to show active status
+```
+
+**Bad examples:**
+```
+Fixed stuff
+Updated code
+Changes
+```
+
+**Format:**
+- Use imperative mood ("Add feature" not "Added feature")
+- First line: brief summary (50 chars or less)
+- Blank line
+- Detailed description if needed
+
+### Testing Your Changes
+
+1. **Manual testing**: Test your changes in the browser
+2. **Edge cases**: Test with invalid inputs and edge cases
+3. **Different roles**: Test as USER, PROFESSIONAL, and ADMIN
+4. **Database state**: Verify database changes are correct
+
+---
+
+## Submitting Pull Requests
+
+### Before Submitting
+
+1. **Ensure code compiles:**
+```bash
+./mvnw clean compile
+```
+
+2. **Test thoroughly** - Verify your changes work as expected
+
+3. **Update documentation** if you:
+   - Add new endpoints
+   - Change existing behavior
+   - Add new configuration options
+
+4. **Check for conflicts:**
+```bash
+git fetch upstream
+git rebase upstream/main
+```
+
+### Creating the Pull Request
+
+1. Push your branch to your fork:
+```bash
+git push origin feature/my-feature
+```
+
+2. Go to the original repository on GitHub
+
+3. Click "New Pull Request"
+
+4. Select your branch
+
+5. Fill out the PR template:
+
+```markdown
+## Description
+Brief description of changes
+
+## Type of Change
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Enhancement
+- [ ] Documentation update
+
+## Testing
+Describe how you tested the changes
+
+## Screenshots (if applicable)
+Add screenshots for UI changes
+```
+
+6. Submit the pull request
+
+### Review Process
+
+- Maintainers will review your PR
+- Address any feedback or requested changes
+- Once approved, your PR will be merged
+
+---
+
+## Issue Reporting
+
+### Before Creating an Issue
+
+1. **Search existing issues** - Your issue may already be reported
+2. **Verify it's a bug** - Ensure it's not expected behavior
+3. **Gather information** - Collect relevant details
+
+### Creating a Good Issue
+
+Include:
+
+1. **Title**: Clear, concise description
+2. **Description**: Detailed explanation
+3. **Steps to reproduce** (for bugs):
+   - Step 1
+   - Step 2
+   - Step 3
+4. **Expected behavior**
+5. **Actual behavior**
+6. **Environment**:
+   - Java version
+   - Database version
+   - Browser (if applicable)
+7. **Screenshots** (if applicable)
+
+### Issue Template
+
+```markdown
+## Bug Report
+
+**Description:**
+What is the issue?
+
+**Steps to Reproduce:**
+1. Go to...
+2. Click on...
+3. See error
+
+**Expected Behavior:**
+What should happen?
+
+**Actual Behavior:**
+What actually happens?
+
+**Environment:**
+- Java: 21
+- Database: PostgreSQL 15
+- Browser: Chrome 120
+
+**Screenshots:**
+[Add screenshots]
+```
+
+---
+
+## Code Review Guidelines
+
+### For Reviewers
+
+- Be respectful and constructive
+- Explain "why" when requesting changes
+- Approve PRs that improve the codebase
+- Focus on:
+  - Code correctness
+  - Security implications
+  - Performance issues
+  - Code maintainability
+
+### For Contributors
+
+- Respond to feedback promptly
+- Ask questions if feedback is unclear
+- Be open to suggestions
+- Update your PR based on feedback
+
+---
+
+## Project Structure
+
+Understanding the project structure will help you contribute effectively:
+
+```
+Duit/
+├── src/
+│   ├── main/
+│   │   ├── java/es/duit/app/
+│   │   │   ├── controller/      # HTTP request handlers
+│   │   │   ├── service/         # Business logic
+│   │   │   ├── repository/      # Data access
+│   │   │   ├── entity/          # Domain models
+│   │   │   ├── dto/             # Data transfer objects
+│   │   │   ├── config/          # Configuration classes
+│   │   │   └── security/        # Security configuration
+│   │   └── resources/
+│   │       ├── templates/       # Thymeleaf views
+│   │       ├── static/          # CSS, JS, images
+│   │       └── application.properties
+│   └── test/                    # Test classes
+├── documentacion/               # Project documentation
+├── pom.xml                      # Maven configuration
+└── README.md
+```
+
+---
+
+## Areas to Contribute
+
+### Good First Issues
+
+- UI improvements
+- Documentation updates
+- Bug fixes
+- Adding validation messages
+- Improving error handling
+
+### Intermediate Issues
+
+- New features
+- Refactoring existing code
+- Performance improvements
+- Adding unit tests
+
+### Advanced Issues
+
+- Security enhancements
+- Architecture improvements
+- Database optimization
+- Integration with external services
+
+---
+
+## Getting Help
+
+If you need help:
+
+1. **Check the documentation** - Read existing docs
+2. **Search issues** - Someone may have had the same question
+3. **Create an issue** - Ask your question
+4. **Be specific** - Provide context and details
+
+---
+
+## Code of Conduct
+
+- Be respectful and inclusive
+- Focus on constructive feedback
+- Help create a welcoming environment
+- Report inappropriate behavior
+
+---
+
+## License
+
+By contributing to Duit, you agree that your contributions will be licensed under the same license as the project.
+
+---
+
+Thank you for contributing to Duit! Your help makes this project better for everyone.

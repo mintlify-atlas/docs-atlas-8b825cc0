@@ -1,0 +1,226 @@
+---
+title: 'User Oversight'
+description: 'Monitor and manage users, roles, and access logs as an administrator'
+---
+
+Administrators have the ability to view and manage all users on the Duit platform, including monitoring their access patterns and managing their roles.
+
+## User Management Overview
+
+The admin user management page is accessible via **GET** `/admin/users` (AdminController.java:17), which displays the user management interface.
+
+<CardGroup cols={2}>
+  <Card title="View All Users" icon="users">
+    Access comprehensive lists of all registered users with their details and status.
+  </Card>
+  
+  <Card title="Monitor Access Logs" icon="clock">
+    Track user login activity, including timestamps, IP addresses, and success status.
+  </Card>
+  
+  <Card title="Manage User Roles" icon="user-tag">
+    Assign and modify user roles to control platform permissions.
+  </Card>
+  
+  <Card title="User Status Control" icon="toggle-on">
+    Activate or deactivate user accounts as needed.
+  </Card>
+</CardGroup>
+
+## User Entity Structure
+
+The `AppUser` entity (AppUser.java:22) contains comprehensive user information:
+
+| Field | Type | Validation | Description |
+|-------|------|------------|-------------|
+| `id` | Long | Auto-generated | Unique user identifier |
+| `firstName` | String | Required, 2-100 chars | User's first name |
+| `lastName` | String | Required, max 150 chars | User's last name |
+| `dni` | String | Pattern: 8 digits + letter | Spanish ID number |
+| `username` | String | Required, valid email, unique | User's email address |
+| `phone` | String | Pattern: 9-15 digits | Contact phone number |
+| `active` | Boolean | Required, default: true | Account status |
+| `registeredAt` | LocalDateTime | Auto-set | Registration timestamp |
+| `lastLoginAt` | LocalDateTime | Auto-updated | Last login timestamp |
+| `role` | UserRole | Required | User's assigned role |
+
+### Key User Methods
+
+```java
+// Get user's full display name
+public String getFullName() {
+    return lastName != null ? firstName + " " + lastName : firstName;
+}
+
+// Check if user is a professional
+public boolean isProfessional() {
+    return professionalProfile != null;
+}
+
+// Check if user has admin privileges
+public boolean isAdmin() {
+    return role != null && role.isAdmin();
+}
+```
+
+Reference: AppUser.java:108-126
+
+## User Roles
+
+The `UserRole` entity (UserRole.java:20) defines the available user roles in the system.
+
+### Available Role Types
+
+The `RoleName` enum (UserRole.java:22) defines four role types:
+
+```java
+public enum RoleName {
+    ADMIN,        // Full system access
+    USER,         // Standard client access
+    PROFESSIONAL, // Service provider access
+    MODERATOR     // Limited admin access
+}
+```
+
+### Role Entity Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | Long | Unique role identifier |
+| `name` | RoleName | Role type enum value |
+| `description` | String | Role description (max 100 chars) |
+| `active` | Boolean | Whether role is active |
+
+### Role Helper Methods
+
+```java
+// Check if role is admin
+public boolean isAdmin() {
+    return RoleName.ADMIN.equals(name);
+}
+
+// Check if role is professional
+public boolean isProfessional() {
+    return RoleName.PROFESSIONAL.equals(name);
+}
+
+// Get count of users with this role
+public int getUsersCount() {
+    return users != null ? users.size() : 0;
+}
+```
+
+Reference: UserRole.java:52-62
+
+## Access Logging
+
+The `AccessLog` entity (AccessLog.java:18) tracks all user login attempts for security monitoring.
+
+### AccessLog Structure
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | Long | Unique log identifier |
+| `accessedAt` | LocalDateTime | When the access attempt occurred |
+| `sourceIp` | String | IP address of the request (max 45 chars) |
+| `success` | boolean | Whether login was successful |
+| `user` | AppUser | Reference to the user account |
+
+### Automatic Timestamp Creation
+
+The access timestamp is automatically set when a log entry is created:
+
+```java
+@PrePersist
+protected void onCreate() {
+    if (accessedAt == null) {
+        accessedAt = LocalDateTime.now();
+    }
+}
+```
+
+Reference: AccessLog.java:43-48
+
+### Database Indexing
+
+Access logs are indexed for efficient querying:
+
+```java
+@Table(name = "access_log", indexes = {
+    @Index(name = "idx_access_log_user", columnList = "id_user"),
+    @Index(name = "idx_access_log_accessed_at", columnList = "accessed_at")
+})
+```
+
+This enables fast lookups by user or by date range for security analysis.
+
+## User Oversight Features
+
+<AccordionGroup>
+  <Accordion title="View User Details">
+    Access comprehensive user information including:
+    - Full name and contact details
+    - Registration date and last login
+    - Assigned role and permissions
+    - Active/inactive status
+    - Professional profile (if applicable)
+  </Accordion>
+  
+  <Accordion title="Monitor Login Activity">
+    Track user access patterns through AccessLog entries:
+    - Login timestamps
+    - Source IP addresses
+    - Success/failure status
+    - Historical login patterns
+  </Accordion>
+  
+  <Accordion title="Manage User Status">
+    Control user account status:
+    - Activate or deactivate accounts
+    - Prevent access without deleting accounts
+    - Preserve user data for historical records
+  </Accordion>
+  
+  <Accordion title="Role Assignment">
+    Assign appropriate roles to users:
+    - **ADMIN**: Full platform management
+    - **PROFESSIONAL**: Service provider capabilities
+    - **USER**: Standard client access
+    - **MODERATOR**: Limited administrative access
+  </Accordion>
+</AccordionGroup>
+
+## Security Considerations
+
+<Warning>
+Access logs contain sensitive information including IP addresses. Ensure compliance with data protection regulations (GDPR, etc.) when storing and processing this data.
+</Warning>
+
+<Info>
+The `password` field in AppUser is excluded from toString and equals operations (AppUser.java:51-53) to prevent accidental password exposure in logs.
+</Info>
+
+## Best Practices
+
+<Steps>
+  <Step title="Regular Access Review">
+    Periodically review access logs to identify suspicious login patterns or unauthorized access attempts.
+  </Step>
+  
+  <Step title="Role Management">
+    Assign the minimum necessary role to each user. Only grant ADMIN or MODERATOR roles to trusted personnel.
+  </Step>
+  
+  <Step title="Account Deactivation">
+    When users no longer need access, deactivate their accounts rather than deleting them to maintain audit trails.
+  </Step>
+  
+  <Step title="Monitor Failed Logins">
+    Pay special attention to multiple failed login attempts from the same IP or for the same user account.
+  </Step>
+</Steps>
+
+## Related Resources
+
+- [Category Management](/guides/admin/category-management) - Managing service categories
+- [Admin Dashboard](/guides/admin/dashboard) - Overview of admin statistics

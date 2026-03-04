@@ -1,0 +1,255 @@
+---
+title: Welcome to Duit
+description: Connect with service professionals and manage job requests seamlessly
+mode: custom
+---
+
+<div className="relative overflow-hidden bg-gradient-to-br from-[#2C3E50] via-[#34495E] to-[#2C3E50] dark:from-[#1a1d27] dark:via-[#2C3E50] dark:to-[#1a1d27] py-20 lg:py-24">
+  <div className="max-w-7xl mx-auto px-6 lg:px-8">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+      <div className="lg:col-span-7">
+        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6">
+          Welcome to Duit Documentation
+        </h1>
+        <p className="text-lg sm:text-xl text-gray-200 dark:text-gray-300 max-w-2xl mb-8">
+          A comprehensive platform connecting clients with service professionals. Find professionals, manage job requests, and build your reputation through ratings and reviews.
+        </p>
+        <div className="flex flex-wrap gap-4">
+          <a
+            href="/getting-started/installation"
+            className="inline-flex items-center px-6 py-3 rounded-lg bg-[#3498DB] hover:bg-[#2980B9] text-white font-medium transition-colors"
+          >
+            Get Started
+            <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </a>
+          <a
+            href="/features"
+            className="inline-flex items-center px-6 py-3 rounded-lg border border-white/30 bg-white/10 hover:bg-white/20 text-white font-medium transition-colors"
+          >
+            Explore Features
+          </a>
+        </div>
+      </div>
+      <div className="lg:col-span-5 hidden lg:block">
+        <div className="relative">
+          <img
+            src="/logo.png"
+            alt="Duit Platform"
+            className="w-full h-auto max-w-md mx-auto"
+            noZoom
+          />
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="mb-16">
+    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+      Quick start
+    </h2>
+    <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+      Get Duit up and running in minutes with these simple steps
+    </p>
+    
+    <Steps>
+      <Step title="Clone the repository">
+        Start by cloning the Duit repository to your local machine:
+        
+        ```bash
+        git clone https://github.com/FerCueA/Duit.git
+        cd Duit
+        ```
+      </Step>
+      
+      <Step title="Configure your database">
+        Create a `.env` file in the project root with your PostgreSQL credentials:
+        
+        ```env
+        DB_URL=jdbc:postgresql://localhost:5432/duit
+        DB_USER=your_username
+        DB_PASS=your_password
+        ```
+        
+        <Note>
+          Make sure PostgreSQL is installed and running on your system before proceeding.
+        </Note>
+      </Step>
+      
+      <Step title="Run the application">
+        Launch the Spring Boot application using Maven:
+        
+        ```bash
+        # On Linux/Mac
+        ./mvnw spring-boot:run
+        
+        # On Windows
+        mvnw.cmd spring-boot:run
+        ```
+        
+        The application will be available at `http://localhost:8080`
+      </Step>
+      
+      <Step title="Create your first account">
+        Navigate to the registration page and create an account as either a client or professional:
+        
+        - **Client**: Search for professionals and create service requests
+        - **Professional**: Create a profile, set your rates, and respond to job opportunities
+        
+        <Tip>
+          Choose the "Professional" account type if you plan to offer services. You can always create additional accounts for testing.
+        </Tip>
+      </Step>
+    </Steps>
+  </div>
+
+  <div className="mb-16">
+    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+      Explore by topic
+    </h2>
+    <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+      Jump into detailed guides based on your role and needs
+    </p>
+    
+    <CardGroup cols={3}>
+      <Card
+        title="For Clients"
+        icon="user"
+        href="/guides/clients/finding-professionals"
+      >
+        Learn how to find professionals, create service requests, and manage your jobs
+      </Card>
+      <Card
+        title="For Professionals"
+        icon="briefcase"
+        href="/guides/professionals/creating-profile"
+      >
+        Set up your professional profile, manage applications, and build your reputation
+      </Card>
+      <Card
+        title="For Administrators"
+        icon="shield-halved"
+        href="/guides/admin/category-management"
+      >
+        Manage service categories, oversee users, and access platform analytics
+      </Card>
+    </CardGroup>
+  </div>
+
+  <div className="mb-16">
+    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+      Key features
+    </h2>
+    <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+      Discover what makes Duit powerful for connecting clients and professionals
+    </p>
+    
+    <CardGroup cols={2}>
+      <Card
+        title="Role-based Access Control"
+        icon="lock"
+        href="/architecture/security"
+      >
+        Secure authentication with Spring Security and role-specific permissions for clients, professionals, and admins
+      </Card>
+      <Card
+        title="Professional Profiles"
+        icon="id-card"
+        href="/guides/professionals/creating-profile"
+      >
+        Detailed profiles with category specializations, hourly rates, and NIF validation
+      </Card>
+      <Card
+        title="Job Application Workflow"
+        icon="list-check"
+        href="/guides/clients/managing-jobs"
+      >
+        Complete lifecycle from service request creation to professional application and job completion
+      </Card>
+      <Card
+        title="Rating System"
+        icon="star"
+        href="/guides/clients/rating-professionals"
+      >
+        Build trust through ratings and reviews that showcase professional reputation
+      </Card>
+      <Card
+        title="Location-based Matching"
+        icon="location-dot"
+        href="/guides/clients/finding-professionals"
+      >
+        Find professionals by service category and location with address handling
+      </Card>
+      <Card
+        title="Admin Dashboard"
+        icon="gauge"
+        href="/guides/admin/dashboard"
+      >
+        Centralized management for categories, users, and platform oversight
+      </Card>
+    </CardGroup>
+  </div>
+
+  <div className="mb-16">
+    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+      Technical resources
+    </h2>
+    <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+      Dive into the architecture and development details
+    </p>
+    
+    <CardGroup cols={2}>
+      <Card
+        title="Architecture Overview"
+        icon="sitemap"
+        href="/architecture/overview"
+      >
+        Understand the Spring Boot architecture and technology stack
+      </Card>
+      <Card
+        title="Database Schema"
+        icon="database"
+        href="/architecture/database-schema"
+      >
+        Explore the PostgreSQL database structure and entity relationships
+      </Card>
+      <Card
+        title="API Endpoints"
+        icon="code"
+        href="/development/api-endpoints"
+      >
+        Reference for all HTTP endpoints and controller routes
+      </Card>
+      <Card
+        title="Contributing Guide"
+        icon="code-pull-request"
+        href="/development/contributing"
+      >
+        Learn how to contribute to the Duit project
+      </Card>
+    </CardGroup>
+  </div>
+</div>
+
+<div className="bg-gradient-to-br from-[#2C3E50] to-[#34495E] dark:from-[#1a1d27] dark:to-[#2C3E50] py-16">
+  <div className="max-w-5xl mx-auto px-6 text-center">
+    <h2 className="text-3xl font-bold text-white mb-4">
+      Ready to get started?
+    </h2>
+    <p className="text-lg text-gray-200 dark:text-gray-300 max-w-2xl mx-auto mb-8">
+      Set up your local development environment and start exploring the Duit platform
+    </p>
+    <a
+      href="/getting-started/installation"
+      className="inline-flex items-center px-8 py-4 rounded-lg bg-[#3498DB] hover:bg-[#2980B9] text-white font-semibold text-lg transition-colors"
+    >
+      Install Duit
+      <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+      </svg>
+    </a>
+  </div>
+</div>

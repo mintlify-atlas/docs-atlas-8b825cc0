@@ -1,0 +1,362 @@
+---
+title: 'Database Schema'
+description: 'Database tables, relationships, and indexes in the Duit application'
+icon: 'database'
+---
+
+## Schema Overview
+
+Duit uses PostgreSQL as its relational database. The schema consists of 9 main tables with well-defined relationships and indexes for optimal query performance.
+
+## Entity-Relationship Diagram
+
+```
+┌──────────────┐
+│  UserRole    │
+└──────┬───────┘
+       │ 1
+       │
+       │ N
+┌──────▼──────────────┐       ┌────────────────┐
+│     AppUser         │───────│  AccessLog     │
+└──────┬──────────────┘  1:N  └────────────────┘
+       │ 1:1
+       │
+       ▼
+┌──────────────────────┐      ┌─────────────────┐
+│ ProfessionalProfile  │◄─────│   Category      │
+└──────┬───────────────┘ M:N  └─────────┬───────┘
+       │ 1                              │ 1
+       │                                │
+       │ N                              │ N
+┌──────▼───────────────┐      ┌─────────▼────────┐
+│  JobApplication      │──────│ ServiceRequest   │
+└──────┬───────────────┘ N:1  └─────────┬────────┘
+       │ 1:1                            │
+       │                                │
+       ▼                                ▼
+┌──────────────────────┐                │
+│    ServiceJob        │◄───────────────┘
+└──────┬───────────────┘      1:N
+       │ 1
+       │
+       │ N
+┌──────▼───────────────┐
+│      Rating          │
+└──────────────────────┘
+
+┌──────────────────────┐
+│     Address          │ (Referenced by AppUser & ServiceRequest)
+└──────────────────────┘
+```
+
+## Core Tables
+
+### user_role
+
+Stores user roles for authorization.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id_role | BIGINT | PRIMARY KEY, AUTO_INCREMENT | Unique role identifier |
+| name | VARCHAR(20) | NOT NULL, UNIQUE | Role name (ADMIN, USER, PROFESSIONAL, MODERATOR) |
+| description | VARCHAR(100) | | Role description |
+| active | BOOLEAN | NOT NULL, DEFAULT TRUE | Whether the role is active |
+| created_by | VARCHAR(100) | | Audit field |
+| created_at | TIMESTAMP | | Audit field |
+| updated_by | VARCHAR(100) | | Audit field |
+| updated_at | TIMESTAMP | | Audit field |
+
+**Indexes**:
+- `idx_role_name` on `name`
+- `idx_role_active` on `active`
+
+### app_user
+
+Core user table for all application users.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id_user | BIGINT | PRIMARY KEY, AUTO_INCREMENT | Unique user identifier |
+| first_name | VARCHAR(100) | NOT NULL | User's first name |
+| last_name | VARCHAR(150) | | User's last name |
+| dni | VARCHAR(9) | UNIQUE | Spanish ID (8 digits + letter) |
+| username | VARCHAR(100) | NOT NULL, UNIQUE | Email address (used for login) |
+| password | VARCHAR(255) | NOT NULL | BCrypt hashed password |
+| phone | VARCHAR(20) | | Phone number |
+| active | BOOLEAN | NOT NULL, DEFAULT TRUE | Account active status |
+| registered_at | TIMESTAMP | | Registration timestamp |
+| last_login_at | TIMESTAMP | | Last successful login |
+| id_role | BIGINT | FOREIGN KEY, NOT NULL | Reference to user_role |
+| id_address | BIGINT | FOREIGN KEY | Reference to address |
+| created_by | VARCHAR(100) | | Audit field |
+| created_at | TIMESTAMP | | Audit field |
+| updated_by | VARCHAR(100) | | Audit field |
+| updated_at | TIMESTAMP | | Audit field |
+
+**Indexes**:
+- `idx_user_username` on `username`
+- `idx_user_dni` on `dni`
+- `idx_user_active` on `active`
+- `idx_user_role` on `id_role`
+
+**Relationships**:
+- `ManyToOne` → `user_role`
+- `ManyToOne` → `address`
+- `OneToOne` → `professional_profile`
+- `OneToMany` → `service_request` (as client)
+- `OneToMany` → `access_log`
+
+### professional_profile
+
+Extends user information for professionals offering services.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id_professional | BIGINT | PRIMARY KEY, FOREIGN KEY | References app_user.id_user |
+| description | TEXT | NOT NULL | Professional bio (50-2000 chars) |
+| hourly_rate | DECIMAL(8,2) | NOT NULL | Hourly rate (5.00-500.00 EUR) |
+| nif | VARCHAR(9) | NOT NULL, UNIQUE | Tax ID (8 digits + letter) |
+| registered_at | TIMESTAMP | | When professional profile was created |
+| created_by | VARCHAR(100) | | Audit field |
+| created_at | TIMESTAMP | | Audit field |
+| updated_by | VARCHAR(100) | | Audit field |
+| updated_at | TIMESTAMP | | Audit field |
+
+**Indexes**:
+- `idx_professional_nif` on `nif`
+- `idx_professional_hourly_rate` on `hourly_rate`
+
+**Relationships**:
+- `OneToOne` → `app_user` (shared primary key)
+- `ManyToMany` ↔ `category` (via professional_category join table)
+- `OneToMany` → `job_application`
+
+### category
+
+Service categories that professionals can specialize in.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id_category | BIGINT | PRIMARY KEY, AUTO_INCREMENT | Unique category identifier |
+| name | VARCHAR(100) | NOT NULL, UNIQUE | Category name |
+| description | VARCHAR(200) | | Category description |
+| active | BOOLEAN | NOT NULL, DEFAULT TRUE | Whether category is active |
+| created_by | VARCHAR(100) | | Audit field |
+| created_at | TIMESTAMP | | Audit field |
+| updated_by | VARCHAR(100) | | Audit field |
+| updated_at | TIMESTAMP | | Audit field |
+
+**Indexes**:
+- `idx_category_name` on `name`
+- `idx_category_active` on `active`
+
+**Relationships**:
+- `ManyToMany` ↔ `professional_profile`
+- `OneToMany` → `service_request`
+
+### address
+
+Physical addresses for users and service locations.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id_address | BIGINT | PRIMARY KEY, AUTO_INCREMENT | Unique address identifier |
+| street_address | VARCHAR(200) | NOT NULL | Street address |
+| city | VARCHAR(100) | NOT NULL | City name |
+| postal_code | VARCHAR(5) | | 5-digit postal code |
+| province | VARCHAR(100) | NOT NULL | Province/state |
+| country | VARCHAR(50) | NOT NULL, DEFAULT 'España' | Country name |
+| created_by | VARCHAR(100) | | Audit field |
+| created_at | TIMESTAMP | | Audit field |
+| updated_by | VARCHAR(100) | | Audit field |
+| updated_at | TIMESTAMP | | Audit field |
+
+**Indexes**:
+- `idx_address_city` on `city`
+- `idx_address_postal` on `postal_code`
+- `idx_address_province` on `province`
+- `idx_address_location` on `city, province`
+- `idx_address_full_location` on `city, postal_code, province`
+
+**Relationships**:
+- `OneToMany` → `app_user`
+- `OneToMany` → `service_request` (as service address)
+
+## Service Management Tables
+
+### service_request
+
+Service requests posted by clients.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id_request | BIGINT | PRIMARY KEY, AUTO_INCREMENT | Unique request identifier |
+| title | VARCHAR(150) | NOT NULL | Request title (5-150 chars) |
+| description | TEXT | NOT NULL | Detailed description (20-2000 chars) |
+| requested_at | TIMESTAMP | | When request was created |
+| deadline | TIMESTAMP | | Optional deadline |
+| status | VARCHAR(20) | NOT NULL | DRAFT, PUBLISHED, IN_PROGRESS, COMPLETED, CANCELLED, EXPIRED |
+| id_client | BIGINT | FOREIGN KEY, NOT NULL | Reference to app_user |
+| id_category | BIGINT | FOREIGN KEY, NOT NULL | Reference to category |
+| id_service_address | BIGINT | FOREIGN KEY | Optional specific service address |
+| created_by | VARCHAR(100) | | Audit field |
+| created_at | TIMESTAMP | | Audit field |
+| updated_by | VARCHAR(100) | | Audit field |
+| updated_at | TIMESTAMP | | Audit field |
+
+**Indexes**:
+- `idx_request_category` on `id_category`
+- `idx_request_client` on `id_client`
+- `idx_request_status` on `status`
+- `idx_request_service_address` on `id_service_address`
+
+**Relationships**:
+- `ManyToOne` → `app_user` (client)
+- `ManyToOne` → `category`
+- `ManyToOne` → `address` (service address)
+- `OneToMany` → `job_application`
+- `OneToMany` → `service_job`
+
+### job_application
+
+Applications from professionals to service requests.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id_application | BIGINT | PRIMARY KEY, AUTO_INCREMENT | Unique application identifier |
+| id_request | BIGINT | FOREIGN KEY, NOT NULL | Reference to service_request |
+| id_professional | BIGINT | FOREIGN KEY, NOT NULL | Reference to professional_profile |
+| message | TEXT | | Application message (max 1000 chars) |
+| proposed_price | DECIMAL(8,2) | | Proposed price for the service |
+| applied_at | TIMESTAMP | | When application was submitted |
+| responded_at | TIMESTAMP | | When client responded |
+| status | VARCHAR(20) | NOT NULL | PENDING, ACCEPTED, REJECTED, WITHDRAWN |
+| created_by | VARCHAR(100) | | Audit field |
+| created_at | TIMESTAMP | | Audit field |
+| updated_by | VARCHAR(100) | | Audit field |
+| updated_at | TIMESTAMP | | Audit field |
+
+**Indexes**:
+- `idx_application_request` on `id_request`
+- `idx_application_professional` on `id_professional`
+- `idx_application_status` on `status`
+- `idx_application_applied_at` on `applied_at`
+
+**Relationships**:
+- `ManyToOne` → `service_request`
+- `ManyToOne` → `professional_profile`
+- `OneToOne` → `service_job`
+
+### service_job
+
+Active or completed jobs (accepted applications).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id_job | BIGINT | PRIMARY KEY, AUTO_INCREMENT | Unique job identifier |
+| agreed_price | DECIMAL(8,2) | NOT NULL | Final agreed price |
+| start_date | TIMESTAMP | | When job started |
+| end_date | TIMESTAMP | | When job was completed |
+| notes | TEXT | | Additional notes (max 2000 chars) |
+| status | VARCHAR(20) | NOT NULL | CREATED, IN_PROGRESS, COMPLETED, CANCELLED, PAUSED |
+| id_request | BIGINT | FOREIGN KEY, NOT NULL | Reference to service_request |
+| id_application | BIGINT | FOREIGN KEY, NOT NULL | Reference to job_application |
+| created_by | VARCHAR(100) | | Audit field |
+| created_at | TIMESTAMP | | Audit field |
+| updated_by | VARCHAR(100) | | Audit field |
+| updated_at | TIMESTAMP | | Audit field |
+
+**Indexes**:
+- `idx_job_status` on `status`
+- `idx_job_request` on `id_request`
+- `idx_job_application` on `id_application`
+- `idx_job_dates` on `start_date, end_date`
+- `idx_job_active` on `status, start_date`
+- `idx_job_price` on `agreed_price`
+
+**Relationships**:
+- `ManyToOne` → `service_request`
+- `ManyToOne` → `job_application`
+- `OneToMany` → `rating`
+
+### rating
+
+Ratings and reviews after job completion.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id_rating | BIGINT | PRIMARY KEY, AUTO_INCREMENT | Unique rating identifier |
+| id_job | BIGINT | FOREIGN KEY, NOT NULL | Reference to service_job |
+| type | VARCHAR(30) | NOT NULL | CLIENT_TO_PROFESSIONAL, PROFESSIONAL_TO_CLIENT |
+| score | INTEGER | NOT NULL | Rating score (1-5) |
+| comment | VARCHAR(500) | | Optional comment |
+| rated_at | TIMESTAMP | | When rating was given |
+| status | VARCHAR(20) | NOT NULL | PENDING, PUBLISHED, HIDDEN |
+| created_by | VARCHAR(100) | | Audit field |
+| created_at | TIMESTAMP | | Audit field |
+| updated_by | VARCHAR(100) | | Audit field |
+| updated_at | TIMESTAMP | | Audit field |
+
+**Indexes**:
+- `idx_rating_job` on `id_job`
+- `idx_rating_type` on `type`
+
+**Relationships**:
+- `ManyToOne` → `service_job`
+
+## Audit & Logging Tables
+
+### access_log
+
+Tracks user login attempts (successful and failed).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id_log | BIGINT | PRIMARY KEY, AUTO_INCREMENT | Unique log identifier |
+| accessed_at | TIMESTAMP | | When access attempt occurred |
+| source_ip | VARCHAR(45) | | IP address of the request |
+| success | BOOLEAN | NOT NULL, DEFAULT FALSE | Whether login was successful |
+| id_user | BIGINT | FOREIGN KEY, NOT NULL | Reference to app_user |
+
+**Indexes**:
+- `idx_access_log_user` on `id_user`
+- `idx_access_log_accessed_at` on `accessed_at`
+
+**Relationships**:
+- `ManyToOne` → `app_user`
+
+## Join Tables
+
+### professional_category
+
+Many-to-many relationship between professionals and categories.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id_professional | BIGINT | FOREIGN KEY, PRIMARY KEY | Reference to professional_profile |
+| id_category | BIGINT | FOREIGN KEY, PRIMARY KEY | Reference to category |
+
+**Composite Primary Key**: `(id_professional, id_category)`
+
+## Cascade Behavior
+
+<Warning>
+Several entities have cascade delete configured. Deleting a parent record will cascade to related records:
+
+- Deleting an `AppUser` will delete their `ProfessionalProfile`, `ServiceRequest`s, and `AccessLog`s
+- Deleting a `ServiceRequest` will delete all `JobApplication`s and `ServiceJob`s
+- Deleting a `ServiceJob` will delete all associated `Rating`s
+- Deleting a `ProfessionalProfile` will delete all `JobApplication`s
+</Warning>
+
+## Auditing
+
+All entities (except `AccessLog`) extend `BaseEntity` which provides automatic auditing:
+
+- `created_by`: Username who created the record
+- `created_at`: Timestamp when record was created
+- `updated_by`: Username who last updated the record
+- `updated_at`: Timestamp of last update
+
+Auditing is enabled through Spring Data JPA's `@EntityListeners(AuditingEntityListener.class)`.

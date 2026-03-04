@@ -1,0 +1,146 @@
+---
+title: Installation
+description: Get Duit up and running on your local machine
+---
+
+## Prerequisites
+
+Before installing Duit, ensure you have the following software installed on your system:
+
+<CardGroup cols={3}>
+  <Card title="Java 21" icon="java">
+    JDK 21 or higher is required to run Duit
+  </Card>
+  <Card title="Maven" icon="box">
+    Maven wrapper (mvnw) is included in the project
+  </Card>
+  <Card title="PostgreSQL" icon="database">
+    PostgreSQL database (local or remote)
+  </Card>
+</CardGroup>
+
+<Warning>
+  Duit requires **Java 21 or higher**. Earlier versions of Java are not supported due to language features used in Spring Boot 3.5.10.
+</Warning>
+
+## Verify Prerequisites
+
+Check that Java 21 is installed and accessible:
+
+<CodeGroup>
+```bash Linux/Mac
+java -version
+```
+
+```bash Windows
+java -version
+```
+</CodeGroup>
+
+You should see output indicating Java version 21 or higher:
+
+```
+java version "21.0.x"
+```
+
+## Clone the Repository
+
+<Steps>
+  <Step title="Clone the project">
+    Clone the Duit repository to your local machine:
+
+    <CodeGroup>
+    ```bash Linux/Mac
+    git clone <url-del-repositorio>
+    cd Duit
+    ```
+
+    ```bash Windows
+    git clone <url-del-repositorio>
+    cd Duit
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Verify project structure">
+    Ensure the Maven wrapper files are present:
+
+    <CodeGroup>
+    ```bash Linux/Mac
+    ls -la mvnw
+    ```
+
+    ```bash Windows
+    dir mvnw.cmd
+    ```
+    </CodeGroup>
+
+    You should see `mvnw` (Linux/Mac) or `mvnw.cmd` (Windows) in the project root.
+  </Step>
+</Steps>
+
+## Database Setup
+
+<Steps>
+  <Step title="Install PostgreSQL">
+    If you don't have PostgreSQL installed, download and install it from [postgresql.org](https://www.postgresql.org/download/).
+
+    Alternatively, you can use a cloud PostgreSQL service like:
+    - [Neon](https://neon.tech/) (recommended for production)
+    - [Supabase](https://supabase.com/)
+    - [ElephantSQL](https://www.elephantsql.com/)
+  </Step>
+
+  <Step title="Create the database">
+    Connect to PostgreSQL and create a new database for Duit:
+
+    ```sql
+    CREATE DATABASE duit;
+    ```
+
+    Or using the command line:
+
+    <CodeGroup>
+    ```bash Linux/Mac
+    psql -U postgres -c "CREATE DATABASE duit;"
+    ```
+
+    ```bash Windows
+    psql -U postgres -c "CREATE DATABASE duit;"
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Note your credentials">
+    Save your database connection details:
+    - **Host**: `localhost` (or your cloud provider's host)
+    - **Port**: `5432` (default PostgreSQL port)
+    - **Database**: `duit`
+    - **Username**: Your PostgreSQL username
+    - **Password**: Your PostgreSQL password
+
+    You'll need these for the configuration step.
+  </Step>
+</Steps>
+
+## Project Dependencies
+
+Duit uses the following key dependencies (automatically managed by Maven):
+
+| Dependency | Version | Purpose |
+|------------|---------|----------|
+| Spring Boot | 3.5.10 | Core framework |
+| Spring Security | 6.x | Authentication & authorization |
+| Spring Data JPA | 3.x | Database operations |
+| PostgreSQL Driver | Latest | Database connectivity |
+| Thymeleaf | 3.x | Template engine |
+| Lombok | 1.18.32 | Code generation |
+| Spring DotEnv | 3.0.0 | Environment variable management |
+
+<Info>
+  All dependencies are defined in `pom.xml` and will be automatically downloaded when you first build the project.
+</Info>
+
+## Next Steps
+
+Now that you have Duit installed and your database set up, proceed to the [Configuration](/getting-started/configuration) guide to configure your application.

@@ -1,0 +1,194 @@
+---
+title: Finding Professionals
+description: Learn how to search for and browse professionals on Duit
+---
+
+## Overview
+
+Duit makes it easy to find qualified professionals for your service needs. You can search by category, location, and keywords to discover professionals that match your requirements.
+
+## Search Interface
+
+The professional search is accessible at `/professional/search` and provides powerful filtering capabilities.
+
+### Search Endpoints
+
+```java ProfessionalController.java:38-57
+@GetMapping("/search")
+public String searchJobs(
+        @RequestParam(required = false) String textoBusqueda,
+        @RequestParam(required = false) Long categoriaId,
+        @RequestParam(required = false) String codigoPostal,
+        Authentication auth,
+        Model model) {
+    
+    // Create DTO from GET parameters
+    SearchRequestDTO filters = new SearchRequestDTO();
+    filters.setTextoBusqueda(textoBusqueda);
+    filters.setCategoriaId(categoriaId);
+    filters.setCodigoPostal(codigoPostal);
+    
+    AppUser currentUser = authService.getAuthenticatedUser(auth);
+    searchService.prepareSearchPageData(filters, currentUser, model);
+    
+    return "jobs/search";
+}
+```
+
+## Search Filters
+
+You can filter professionals using three main criteria:
+
+### Text Search
+Search by keywords in the service request title or description. The search is case-insensitive and matches partial text.
+
+### Category Filter
+Filter by service category (e.g., Plumbing, Electrical, Carpentry). Categories must be active in the system.
+
+### Location Filter
+Search by postal code to find professionals in your area. The system matches exact postal codes from service addresses.
+
+### Search Implementation
+
+```java SearchService.java:88-159
+private List<ServiceRequest> searchJobs(SearchRequestDTO filters, AppUser user) {
+    List<ServiceRequest> jobs = getPublishedJobs();
+    
+    // Get IDs of jobs where user already applied (not withdrawn)
+    final Set<Long> appliedJobIds;
+    if (user != null && user.getProfessionalProfile() != null) {
+        List<JobApplication> myApplications = jobApplicationRepository
+                .findByProfessional(user.getProfessionalProfile());
+        
+        // Filter only active applications (not withdrawn)
+        appliedJobIds = myApplications.stream()
+                .filter(app -> app.getStatus() != JobApplication.Status.WITHDRAWN)
+                .map(app -> app.getRequest().getId())
+                .collect(Collectors.toSet());
+    } else {
+        appliedJobIds = new HashSet<>();
+    }
+    
+    // Return all if no filters (excluding already applied)
+    if (filters == null) {
+        List<ServiceRequest> filtered = jobs.stream()
+                .filter(job -> !appliedJobIds.contains(job.getId()))
+                .collect(Collectors.toList());
+        return sortJobsByDate(filtered);
+    }
+    
+    List<ServiceRequest> result = new ArrayList<>();
+    
+    // Search each job
+    for (ServiceRequest job : jobs) {
+        boolean matches = true;
+        
+        // Filter: exclude jobs where already applied
+        if (appliedJobIds.contains(job.getId())) {
+            continue;
+        }
+        
+        // Text filter (if exists)
+        if (filters.getTextoBusqueda() != null && !filters.getTextoBusqueda().trim().isEmpty()) {
+            String searchText = filters.getTextoBusqueda().toLowerCase().trim();
+            String title = (job.getTitle() != null) ? job.getTitle().toLowerCase() : "";
+            String description = (job.getDescription() != null) ? job.getDescription().toLowerCase() : "";
+            
+            if (!title.contains(searchText) && !description.contains(searchText)) {
+                matches = false;
+            }
+        }
+        
+        // Category filter (if exists)
+        if (matches && filters.getCategoriaId() != null) {
+            if (job.getCategory() == null || !job.getCategory().getId().equals(filters.getCategoriaId())) {
+                matches = false;
+            }
+        }
+        
+        // Postal code filter (if exists)
+        if (matches && filters.getCodigoPostal() != null && !filters.getCodigoPostal().trim().isEmpty()) {
+            String postalCode = filters.getCodigoPostal().trim();
+            if (job.getEffectiveServiceAddress() == null ||
+                    !postalCode.equals(job.getEffectiveServiceAddress().getPostalCode())) {
+                matches = false;
+            }
+        }
+        
+        // If passes all filters, add it
+        if (matches) {
+            result.add(job);
+        }
+    }
+    
+    return sortJobsByDate(result);
+}
+```
+
+## Viewing Service Requests
+
+When browsing search results, you'll see:
+
+- **Service request title and description** - What the client needs
+- **Category** - Type of service required
+- **Location** - Service address (postal code and city)
+- **Posted date** - When the request was published
+- **Application count** - Number of professionals who have applied
+
+<Note>
+Only service requests with status `PUBLISHED` are shown in search results. Draft, cancelled, or completed requests are excluded.
+</Note>
+
+## Request Status
+
+Service requests can have the following statuses:
+
+```java ServiceRequest.java:24-26
+public enum Status {
+    DRAFT, PUBLISHED, IN_PROGRESS, COMPLETED, CANCELLED, EXPIRED
+}
+```
+
+As a client, you'll primarily interact with:
+- **PUBLISHED** - Visible to professionals and accepting applications
+- **IN_PROGRESS** - Professional has been selected and work has begun
+- **COMPLETED** - Work is finished and ready for rating
+
+## Viewing Professional Profiles
+
+When viewing professionals who have applied to your request, you can see:
+
+- Professional's ratings and reviews from previous clients
+- Proposed price for the service
+- Personal message from the professional
+- Application date
+
+<Tip>
+Professionals cannot apply to the same request twice. Once they submit an application, the request disappears from their search results unless they withdraw their application.
+</Tip>
+
+## Best Practices
+
+<Steps>
+  <Step title="Start broad">
+    Begin with a category search to see all available professionals in your service area.
+  </Step>
+  
+  <Step title="Refine by location">
+    Add your postal code to find professionals near you.
+  </Step>
+  
+  <Step title="Use keywords">
+    Add specific keywords to find professionals with relevant experience.
+  </Step>
+  
+  <Step title="Review profiles">
+    Check ratings and reviews before selecting a professional.
+  </Step>
+</Steps>
+
+## Related
+
+- [Creating Service Requests](/guides/clients/creating-requests)
+- [Managing Jobs](/guides/clients/managing-jobs)
+- [Rating Professionals](/guides/clients/rating-professionals)

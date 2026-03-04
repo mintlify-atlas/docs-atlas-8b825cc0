@@ -1,0 +1,358 @@
+---
+title: 'Service Layer Documentation'
+description: 'Documentation of all service classes and their key methods in the Duit application'
+---
+
+# Service Layer Documentation
+
+The service layer contains business logic and orchestrates interactions between controllers and repositories.
+
+## Authentication & User Management
+
+### AuthService
+**Location:** `es.duit.app.service.AuthService`
+
+**Purpose:** Manages user authentication and retrieval of authenticated users.
+
+**Key Methods:**
+```java
+public AppUser getAuthenticatedUser(Authentication auth)
+```
+Retrieves the currently authenticated user from the security context. Throws `IllegalStateException` if user is not authenticated.
+
+---
+
+### AppUserService
+**Location:** `es.duit.app.service.AppUserService`
+
+**Purpose:** Handles user profile operations including updates and account deactivation.
+
+**Key Methods:**
+
+```java
+public AppUser updateUserProfile(EditProfileDTO dto)
+```
+Updates the user's basic profile information including name, phone, and address.
+
+```java
+public AppUser updateProfessionalProfile(EditProfileDTO dto)
+```
+Updates professional profile information including hourly rate, NIF, and description.
+
+```java
+public AppUser getCurrentUser()
+```
+Returns the currently authenticated user.
+
+```java
+public void deactivateCurrentUser()
+```
+Deactivates the current user's account (soft delete).
+
+---
+
+### RegistroService
+**Location:** `es.duit.app.service.RegistroService`
+
+**Purpose:** Handles new user registration with validation.
+
+**Key Methods:**
+
+```java
+public AppUser registerUser(RegistroDTO registro)
+```
+Registers a new user with email, DNI, and role validation. Encrypts password before storage.
+
+**Validations:**
+- Email uniqueness
+- DNI uniqueness
+- Role assignment (USER or PROFESSIONAL)
+
+---
+
+### AccessLogService
+**Location:** `es.duit.app.service.AccessLogService`
+
+**Purpose:** Logs successful and failed login attempts.
+
+**Key Methods:**
+
+```java
+public void saveSuccessfulLogin(String emailUsuario, HttpServletRequest request)
+```
+Records successful login and updates user's last login timestamp.
+
+```java
+public void saveFailedLogin(String emailUsuario, HttpServletRequest request)
+```
+Records failed login attempt with IP address.
+
+---
+
+## Service Request Management
+
+### RequestService
+**Location:** `es.duit.app.service.RequestService`
+
+**Purpose:** Manages service requests (creation, editing, state changes).
+
+**Key Methods:**
+
+```java
+public ServiceRequest saveRequest(RequestDTO form, AppUser usuario)
+```
+Creates or updates a service request with address and category validation.
+
+```java
+public ServiceRequest publishRequest(Long solicitudId, AppUser usuario)
+```
+Publishes a draft request, making it visible to professionals.
+
+```java
+public ServiceRequest unpublishRequest(Long solicitudId, AppUser usuario)
+```
+Unpublishes a request, returning it to draft status.
+
+```java
+public ServiceRequest cancelRequest(Long solicitudId, AppUser usuario)
+```
+Cancels a published request.
+
+```java
+public ServiceRequest reactivateRequest(Long solicitudId, AppUser usuario)
+```
+Reactivates a cancelled request to draft status.
+
+```java
+public void deleteRequest(Long solicitudId, AppUser usuario)
+```
+Permanently deletes a request.
+
+```java
+public List<ServiceRequest> getMyRequests()
+```
+Returns all requests for the authenticated user.
+
+```java
+public List<JobApplication> getApplicationsForMyRequest(Long requestId)
+```
+Returns all applications for a specific request.
+
+---
+
+### SearchService
+**Location:** `es.duit.app.service.SearchService`
+
+**Purpose:** Handles searching and filtering of published service requests.
+
+**Key Methods:**
+
+```java
+public void prepareSearchPageData(SearchRequestDTO filters, AppUser user, Model model)
+```
+Prepares all data needed for the search page including filtered jobs, categories, and postal codes.
+
+**Filter Capabilities:**
+- Text search (title and description)
+- Category filter
+- Postal code filter
+- Excludes requests where user has already applied
+
+---
+
+## Job Application Management
+
+### JobApplicationService
+**Location:** `es.duit.app.service.JobApplicationService`
+
+**Purpose:** Manages professional applications to service requests.
+
+**Key Methods:**
+
+```java
+public JobApplication postularseAOferta(Long ofertaId, BigDecimal precio, String mensaje, AppUser usuario)
+```
+Creates a new application to a service request with validation.
+
+**Validations:**
+- User has professional profile
+- User has address configured
+- Offer is published
+- User is not the offer owner
+- User hasn't applied before
+- Price is valid
+
+```java
+public JobApplication editarPostulacion(Long postulacionId, AppUser usuario, BigDecimal precio, String mensaje)
+```
+Edits an existing pending application.
+
+```java
+public JobApplication retirarPostulacion(Long postulacionId, AppUser usuario)
+```
+Withdraws a pending application.
+
+---
+
+### JobService
+**Location:** `es.duit.app.service.JobService`
+
+**Purpose:** Manages job lifecycle and state transitions.
+
+**Key Methods:**
+
+```java
+public ServiceJob acceptApplication(Long applicationId, AppUser usuario)
+```
+Accepts an application, creates a job, and rejects other pending applications.
+
+```java
+public void rejectApplication(Long applicationId, AppUser usuario)
+```
+Rejects an application.
+
+```java
+public void startJob(Long jobId, AppUser usuario)
+```
+Starts a created job (changes status from CREATED to IN_PROGRESS).
+
+```java
+public void pauseJob(Long jobId, AppUser usuario)
+```
+Pauses an in-progress job.
+
+```java
+public void resumeJob(Long jobId, AppUser usuario)
+```
+Resumes a paused job.
+
+```java
+public void completeJob(Long jobId, AppUser usuario)
+```
+Marks a job as completed.
+
+```java
+public void cancelJob(Long jobId, AppUser usuario)
+```
+Cancels a job and returns the request to published status.
+
+**Job States:** CREATED → IN_PROGRESS → PAUSED → COMPLETED / CANCELLED
+
+---
+
+## Rating Management
+
+### RatingService
+**Location:** `es.duit.app.service.RatingService`
+
+**Purpose:** Manages ratings between clients and professionals for completed jobs.
+
+**Key Methods:**
+
+```java
+public Rating createRating(Long jobId, Integer score, String comment, AppUser usuario)
+```
+Creates a rating for a completed job.
+
+**Validations:**
+- Score between 1 and 5
+- User has permission (is client or professional)
+- Job is completed
+- No existing rating of the same type
+
+```java
+public List<Rating> getProfessionalRatings(AppUser usuario)
+```
+Returns all published ratings for a professional.
+
+```java
+public double calculateAverageScore(List<Rating> ratings)
+```
+Calculates average score from a list of ratings.
+
+**Rating Types:**
+- `CLIENT_TO_PROFESSIONAL`: Client rates professional
+- `PROFESSIONAL_TO_CLIENT`: Professional rates client
+
+---
+
+## Category Management
+
+### CategoryService
+**Location:** `es.duit.app.service.CategoryService`
+
+**Purpose:** CRUD operations for service categories.
+
+**Key Methods:**
+
+```java
+public CategoryDTO save(CategoryDTO categoryDTO)
+```
+Creates or updates a category with duplicate name validation.
+
+```java
+public void toggleStatus(Long id)
+```
+Toggles a category between active and inactive states.
+
+```java
+public void deleteById(Long id)
+```
+Deletes a category by ID.
+
+```java
+public List<CategoryDTO> findAllOrdered()
+```
+Returns all categories ordered by ID.
+
+```java
+public CategoryDTO findById(Long id)
+```
+Finds a category by ID.
+
+---
+
+## History & Reporting
+
+### HistoryService
+**Location:** `es.duit.app.service.HistoryService`
+
+**Purpose:** Provides job history for users (as client and professional).
+
+**Key Methods:**
+
+```java
+public List<HistoryDTO> getHistoryForUser(AppUser usuario)
+```
+Returns complete job history for a user, including:
+- Jobs where user was the client
+- Jobs where user was the professional
+- Sorted by start date (most recent first)
+
+**HistoryDTO includes:**
+- Job details (status, price, dates)
+- Request information (title, description, category)
+- Application data (proposed price, status)
+- Client information
+- Professional information
+
+---
+
+## Service Dependencies
+
+Common dependencies used across services:
+
+- **Repositories**: Data access layer (JPA repositories)
+- **PasswordEncoder**: For password hashing (BCrypt)
+- **Authentication**: Spring Security context
+- **@Transactional**: Transaction management
+- **@RequiredArgsConstructor**: Lombok for constructor injection
+
+## Error Handling
+
+Services commonly throw:
+- `IllegalArgumentException`: For validation errors
+- `IllegalStateException`: For state-related errors
+- `RuntimeException`: For unexpected errors
+
+Controllers catch these exceptions and provide user-friendly error messages via flash attributes.

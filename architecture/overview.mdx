@@ -1,0 +1,180 @@
+---
+title: 'Technical Architecture Overview'
+description: 'Spring Boot stack, technology choices, and project structure for Duit'
+icon: 'layer-group'
+---
+
+## Technology Stack
+
+Duit is built on a modern Java-based technology stack, leveraging the power of Spring Boot 3.5 and related ecosystem tools.
+
+### Core Framework
+
+- **Spring Boot**: 3.5.10
+- **Java**: 21
+- **Build Tool**: Maven 3.11.0
+
+### Spring Modules
+
+The application uses several Spring Boot starters to provide comprehensive functionality:
+
+| Module | Purpose |
+|--------|--------|
+| `spring-boot-starter-web` | REST API and MVC web layer |
+| `spring-boot-starter-data-jpa` | Database access with JPA/Hibernate |
+| `spring-boot-starter-security` | Authentication and authorization |
+| `spring-boot-starter-validation` | Bean validation with Hibernate Validator |
+| `spring-boot-starter-thymeleaf` | Server-side HTML templating |
+| `spring-boot-starter-mail` | Email functionality |
+| `spring-boot-starter-actuator` | Application monitoring and health checks |
+| `spring-boot-starter-test` | Testing framework (test scope) |
+
+### Database & Persistence
+
+- **Database**: PostgreSQL
+- **ORM**: Hibernate (via Spring Data JPA)
+- **Connection Pooling**: HikariCP (default in Spring Boot)
+
+### Security
+
+- **Spring Security**: 6.x (via Spring Boot 3.5)
+- **Password Encoding**: BCrypt
+- **Authentication**: Form-based with custom handlers
+- **Thymeleaf Security**: `thymeleaf-extras-springsecurity6`
+
+### Additional Libraries
+
+| Library | Version | Purpose |
+|---------|---------|--------|
+| Lombok | 1.18.32 | Reduce boilerplate code |
+| spring-dotenv | 3.0.0 | Load environment variables from .env files |
+
+## Project Structure
+
+The application follows a standard Spring Boot project structure:
+
+```
+src/main/java/es/duit/app/
+├── config/           # Configuration classes (Security, etc.)
+├── controller/       # Web controllers and REST endpoints
+├── entity/          # JPA entity classes
+├── repository/      # Spring Data JPA repositories
+├── service/         # Business logic layer
+├── security/        # Custom security components
+└── DuitApplication.java  # Main application entry point
+```
+
+### Package Organization
+
+**Config Package** (`es.duit.app.config`)
+- Security configuration
+- Custom authentication handlers
+- Application-wide beans
+
+**Entity Package** (`es.duit.app.entity`)
+- JPA entity classes mapped to database tables
+- Auditing base class for tracking entity changes
+- Relationship definitions between entities
+
+**Repository Package** (`es.duit.app.repository`)
+- Spring Data JPA repository interfaces
+- Custom query methods
+- Database access layer
+
+**Service Package** (`es.duit.app.service`)
+- Business logic implementation
+- Transaction management
+- Service layer interfaces and implementations
+
+**Controller Package** (`es.duit.app.controller`)
+- MVC controllers for web pages
+- Request/response handling
+- View model preparation
+
+**Security Package** (`es.duit.app.security`)
+- Custom UserDetailsService implementation
+- Security utilities
+- Authentication components
+
+## Application Architecture
+
+Duit follows a layered architecture pattern:
+
+```
+┌─────────────────────────────────────┐
+│     Presentation Layer              │
+│  (Controllers + Thymeleaf Views)    │
+└─────────────────┬───────────────────┘
+                  │
+┌─────────────────▼───────────────────┐
+│      Service Layer                  │
+│   (Business Logic + Validation)     │
+└─────────────────┬───────────────────┘
+                  │
+┌─────────────────▼───────────────────┐
+│    Repository Layer                 │
+│    (Spring Data JPA)                │
+└─────────────────┬───────────────────┘
+                  │
+┌─────────────────▼───────────────────┐
+│      Database Layer                 │
+│       (PostgreSQL)                  │
+└─────────────────────────────────────┘
+```
+
+### Security Layer
+
+Spring Security is integrated across all layers:
+- **Filter Chain**: Intercepts all requests for authentication/authorization
+- **UserDetailsService**: Loads user data from the database
+- **Password Encoder**: BCrypt hashing for secure password storage
+- **Success/Failure Handlers**: Custom login flow management
+
+## Configuration Management
+
+The application supports multiple configuration sources:
+
+1. **application.properties**: Main configuration file
+2. **.env file**: Environment-specific variables (via spring-dotenv)
+3. **Environment Variables**: Runtime configuration
+
+### Key Configuration Areas
+
+- Database connection (URL, username, password)
+- JPA/Hibernate settings (DDL auto, SQL logging)
+- Security settings (session timeout, remember-me)
+- Mail server configuration
+- Application-specific properties
+
+## Build Configuration
+
+The project uses Maven with the following key configurations:
+
+```xml
+<properties>
+    <java.version>21</java.version>
+</properties>
+```
+
+**Maven Plugins**:
+- `spring-boot-maven-plugin`: Builds executable JAR
+- `maven-compiler-plugin`: Configures Java 21 compilation with Lombok annotation processing
+
+## Deployment
+
+The application can be deployed as:
+- **Standalone JAR**: Self-contained executable with embedded Tomcat
+- **WAR**: Deployable to external application servers
+- **Container**: Docker containerization supported
+
+## Monitoring & Management
+
+Spring Boot Actuator provides production-ready features:
+- Health checks (`/actuator/health`)
+- Application metrics
+- Environment information
+- Application info endpoint
+
+<Note>
+For security in production, ensure actuator endpoints are properly secured and not publicly accessible.
+</Note>
