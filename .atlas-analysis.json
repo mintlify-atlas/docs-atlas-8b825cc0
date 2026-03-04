@@ -1,0 +1,124 @@
+{
+  "projectType": "saas",
+  "projectName": "Duit",
+  "projectDescription": "Web platform connecting clients with service professionals for job requests, applications, and ratings.",
+  "theme": "almond",
+  "primaryColor": "#2C3E50",
+  "lightColor": "#3498DB",
+  "darkColor": "#E67E22",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Overview",
+        "groups": [
+          {
+            "group": "Introduction",
+            "pages": [
+              "introduction",
+              "features",
+              "how-it-works"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Getting Started",
+        "groups": [
+          {
+            "group": "Setup",
+            "pages": [
+              "getting-started/installation",
+              "getting-started/configuration",
+              "getting-started/deployment"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "User Guides",
+        "groups": [
+          {
+            "group": "For Clients",
+            "pages": [
+              "guides/clients/finding-professionals",
+              "guides/clients/creating-requests",
+              "guides/clients/managing-jobs",
+              "guides/clients/rating-professionals"
+            ]
+          },
+          {
+            "group": "For Professionals",
+            "pages": [
+              "guides/professionals/creating-profile",
+              "guides/professionals/managing-applications",
+              "guides/professionals/job-history"
+            ]
+          },
+          {
+            "group": "For Administrators",
+            "pages": [
+              "guides/admin/category-management",
+              "guides/admin/user-oversight",
+              "guides/admin/dashboard"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Architecture",
+        "groups": [
+          {
+            "group": "Technical Overview",
+            "pages": [
+              "architecture/overview",
+              "architecture/database-schema",
+              "architecture/entities",
+              "architecture/security"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Development",
+        "groups": [
+          {
+            "group": "Reference",
+            "pages": [
+              "development/api-endpoints",
+              "development/services",
+              "development/controllers"
+            ]
+          },
+          {
+            "group": "Contributing",
+            "pages": [
+              "development/contributing",
+              "development/testing"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "User registration and authentication with role-based access control",
+    "Professional profiles with category specializations and hourly rates",
+    "Service request creation and job application workflow",
+    "Rating and review system for professionals",
+    "Admin dashboard for category and user management",
+    "Location-based service matching with address handling"
+  ],
+  "publicApiSurface": [
+    "PublicController - /login, /signup, /register endpoints",
+    "DashboardController - /home, /search endpoints",
+    "RequestFormController - /requests/new, /requests/create",
+    "ProfessionalController - /professional/profile, /professional/applications",
+    "RatingsController - /ratings endpoints",
+    "AdminController - /admin endpoints",
+    "CategoryService - Category management operations",
+    "RequestService - Service request CRUD operations",
+    "JobApplicationService - Job application workflow",
+    "RatingService - Rating and review management",
+    "SearchService - Professional and service search"
+  ]
+}
